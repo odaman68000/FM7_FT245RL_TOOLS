@@ -1,0 +1,82 @@
+;********************************************************
+; FT245TRN: FT245RL transfer routine
+; Copyright (C) 2019 by odaman68000. All rights reserved.
+;********************************************************
+
+BANKIO	equ	$fd0f
+FT245A	equ	$fdfd
+FT245B	equ	$fdfe
+
+	org	$fc00
+
+start	fdb	$0000
+bottom	fdb	$0000
+exec	fdb	$0000
+
+; receive data block from FT245RL
+; IN: start, bottom
+recv	leay	recvbx,pcr
+	bsr	worker
+	ldx	exec,pcr
+	beq	recv0
+	jsr	,x
+recv0	rts
+
+; send data block to FT245RL
+; IN: start, bottom
+send	leay	sendbx,pcr
+worker	leax	start,pcr
+	ldb	#6
+worke0	jsr	,y
+	decb
+	bne	worke0
+	ldx	start,pcr
+worke1	jsr	,y
+	cmpx	bottom,pcr
+	bne	worke1
+	rts
+
+; send 1 byte to FT245RL from (X).
+; IN: X=send data address
+;OUT: X=X+1
+sendbx	lda	,x
+	bsr	sendb
+	lda	,x+
+	rts
+
+; send 1 byte to FT245RL.
+; IN: A=data
+;OUT: (none)
+sendb	sta	FT245B
+	lda	#$02
+	sta	FT245A
+	clr	FT245A
+	stx	$fffe,pcr
+	rts
+
+; receive 1 byte to (X) from FT245RL.
+; IN: X=address to receive data
+;OUT: A=data, X=X+1
+recvbx	bsr	recvb
+	sta	,x+
+	rts
+
+; receive 1 byte from FT245RL.
+; IN: (none)
+;OUT: A=data
+recvb	lda	FT245B
+	bmi	recvb
+	bsr	recvb0
+	lsla
+	sta	,-s
+	bsr	recvb0
+	anda	#$7f
+	ora	,s+
+	rts
+recvb0	lda	#$01
+	sta	FT245A
+	lda	FT245B
+	clr	FT245A
+	rts
+
+	end

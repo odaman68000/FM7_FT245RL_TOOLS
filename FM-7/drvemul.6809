@@ -1,0 +1,47 @@
+;********************************************************
+; DRVEMUL: FT245RL floppy drive emulator
+; Copyright (C) 2019 by odaman68000. All rights reserved.
+;********************************************************
+
+BIOHOK	equ	$00de
+HOOK	equ	$fc00
+SAVHOK	equ	$fc7d
+
+	org	$6809
+
+	jmp	remhok,pcr
+	jmp	sethok,pcr
+
+remhok	ldx	#SAVHOK
+	ldu	#BIOHOK
+	ldb	#3
+remho0	lda	,x+
+	sta	,u+
+	decb
+	bne	remho0
+	rts
+
+sethok	ldx	#SAVHOK
+	ldu	#BIOHOK
+	ldb	#3
+setho0	lda	,u+
+	sta	,x+
+	decb
+	bne	setho0
+
+	ldx	#HOOK
+	leau	hokbdy,pcr
+	ldb	#hokend-hokbdy
+setho1	lda	,u+
+	sta	,x+
+	decb
+	bne	setho1
+
+	ldx	#HOOK
+	stx	BIOHOK+1
+	rts
+
+hokbdy	includebin "DBODY"
+hokend
+
+	end

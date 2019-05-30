@@ -1,0 +1,59 @@
+;********************************************************
+; DRVEMUL: FT245RL floppy drive emulator
+; Copyright (C) 2019 by odaman68000. All rights reserved.
+;********************************************************
+
+SAVHOK	equ	$fc7d
+FT245A	equ	$fdfd
+FT245B	equ	$fdfe
+
+	org	$fc00
+
+hook	lda	7,x
+	bne	orghok
+	lda	,x
+	suba	#8
+	beq	f08
+	bcs	orghok
+	cmpa	#3
+	bcc	orghok
+	tfr	x,u
+	leay	sendb,pcr
+	deca
+	beq	f09a
+	leay	recvb-sendb,y
+f09a	ldb	#8
+f09a0	bsr	sendb
+	decb
+	bne	f09a0
+	ldu	2,x
+f09a1	jsr	,y
+	decb
+	bne	f09a1
+f08	clr	1,x
+	rts
+orghok	jmp	SAVHOK
+
+sendb	lda	,u+
+	sta	FT245B
+	lda	#$02
+	sta	FT245A
+	bra	recvb1
+
+recvb	lda	FT245B
+	bmi	recvb
+	bsr	recvb0
+	lsla
+	sta	,u
+	bsr	recvb0
+	anda	#$7f
+	ora	,u
+	sta	,u+
+	rts
+recvb0	lda	#$01
+	sta	FT245A
+	lda	FT245B
+recvb1	clr	FT245A
+	rts
+
+	end

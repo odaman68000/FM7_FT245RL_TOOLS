@@ -1,0 +1,278 @@
+;********************************************************
+; FT245D77: FT245RL transfer disk sector data
+; Copyright (C) 2019 by odaman68000. All rights reserved.
+;********************************************************
+
+BENT	equ	$fbfa	; BIOS entry
+BREAK	equ	$fd04	; interrupt control I/O $FD
+FT245A	equ	$fdfd
+FT245B	equ	$fdfe
+FIRQHK	equ	$01e0
+
+;CC: EFHINZVC
+;    E: Entire
+;    F: Firq disabled
+;    H: Half carry flag
+;    I: Irq disabled
+;    N: Negative flag
+;    Z: Zero flag
+;    V: oVerflow flag
+;    C: Carry flag
+
+SBUF	equ	$3000
+
+print	macro
+	pshs	x
+	leax	\{1},pcr
+	lbsr	sout
+	puls	x
+	endm
+
+	org	$2000
+
+	jmp	pctofm
+	jmp	fmtopc
+
+pctofm	lbsr	init
+	lbsr	iniirq
+	lbsr	wmain
+	lbsr	endirq
+	rts
+
+fmtopc	rts
+
+main0	fcb	"FT245D77 version 1.0",$0d,$0a
+	fcb	"Copyright 2019 by Tetsuo Oda.",$0d,$0a,$0d,$0a
+	fcb	"BREAK key to stop receiving.",$0d,$0a,$0d,$0a,$00
+main1	fcb	"Receiving:",$00
+main2	fcb	" Cluster #",$00
+main3	fcb	" Sector #",$00
+main4	fcb	" Head #",$00
+main5	fcb	", and written.",$0d,$0a,$00
+
+wmain	leax	main0,pcr
+	lbsr	sout
+
+start	leax	main1,pcr
+	lbsr	sout
+
+	ldx	#SBUF
+	bsr	rcvsec
+	beq	start1
+	bcs	start3
+
+	ldx	#SBUF
+	bsr	prtsec
+
+	ldx	#SBUF
+	bsr	wrtsec
+	beq	start2
+
+	lbsr	error
+	bra	start0
+
+start2	leax	main5,pcr
+	lbsr	sout
+
+start0	lbsr	sndtck
+	bra	start
+
+start1	lbsr	wend
+	rts
+
+start3	lbsr	abort
+	rts
+
+prtsec	tfr	x,u
+	leax	main2,pcr
+	lbsr	sout
+	lda	,u		; Cluster
+	lbsr	decout
+	leax	main3,pcr
+	lbsr	sout
+	lda	2,u		; Sector
+	lbsr	decout
+	leax	main4,pcr
+	lbsr	sout
+	lda	1,u		; Head
+	lbsr	decout
+	rts
+
+wrtsec	tfr	x,u
+	leax	wrtrcb,pcr
+	ldy	#SBUF+16	; Data
+	sty	2,x
+	lda	,u		; Cluster
+	sta	4,x
+	lda	2,u		; Sector#
+	sta	5,x
+	lda	1,u		; Head
+	sta	6,x
+	jsr	[BENT]
+	lda	wrtrcb+1,pcr
+	rts
+
+; IN:X=address
+;OUT:ZF is set if EOD, CF is set if BREAK is pressed.
+rcvsec	lbsr	recvb
+	bcs	rcvse2
+	cmpa	#$ff
+	beq	rcvse3
+	ldb	#15
+rcvse0	pshs	b
+	lbsr	recvb
+	puls	b
+	bcs	rcvse2
+	decb
+	bne	rcvse0
+	ldd	-2,x
+	exg	a,b
+	std	-2,x
+	tfr	d,u
+rcvse1	pshs	u
+	lbsr	recvb
+	puls	u
+	bcs	rcvse2
+	leau	-1,u
+	cmpu	#0
+	bne	rcvse1
+	andcc	#$fa		;reset ZF,CF
+	rts
+rcvse2	andcc	#$fa		;reset ZF,CF
+	orcc	#$01		;set carry
+rcvse3	rts
+
+sndtck	rts			;nothing to do
+
+error	leax	error0,pcr
+	bsr	sout
+	rts
+error0	fcb	", Failed to write.",$0d,$0a,$00
+
+wend	leax	wend0,pcr
+	bsr	sout
+	rts
+wend0	fcb	$0d,$0a,"Done.",$0d,$0a,$00
+
+abort	leax	abort0,pcr
+	bsr	sout
+	rts
+abort0	fcb	$0d,$0a,"Aborted.",$0d,$0a,$00
+
+; IN: A=value
+decout	pshs	a,b,x,y,u
+	leax	decou9,pcr
+	ldb	#100
+	bsr	decou0
+	ldb	#10
+	bsr	decou0
+	tfr	a,b
+	bsr	decou3
+	clra
+	sta	,x
+	leax	decou9,pcr
+	bsr	sout
+	puls	a,b,x,y,u,pc
+decou0	stb	decou8,pcr
+	clrb
+decou1	suba	decou8,pcr
+	bcs	decou2
+	incb
+	bra	decou1
+decou2	adda	decou8,pcr
+decou3	addb	#'0'
+	stb	,x+
+	rts
+decou8	fcb	0
+decou9	fcb	0,0,0,0
+
+; IN: X=string
+sout	pshs	a,b,x,y,u
+	clrb
+sout0	lda	b,x
+	beq	sout1
+	incb
+	bra	sout0
+sout1	tfr	x,u
+	leax	strrcb,pcr
+	stu	2,x
+	clra
+	std	4,x
+	jsr	[BENT]
+	puls	a,b,x,y,u,pc
+
+wrtrcb	fcb	$09,$00	;WRITE
+	fdb	0	;2 Data
+	fcb	0	;4 Cluster
+	fcb	0	;5 Sector
+	fcb	0	;6 Head
+	fcb	0	;7 Drive#
+
+strrcb	fcb	$14,$00	;OUTPUT
+	fdb	0
+	fdb	0
+ 
+init	lda	#$ff
+	sta	runing,pcr
+	rts
+
+iniirq	ldx	#FIRQHK
+	leau	svfirq,pcr
+	ldb	#3
+	bsr	ldirxu
+	leax	jpfirq,pcr
+	leau	firq,pcr
+	stu	1,x
+	ldu	#FIRQHK
+	ldb	#3
+	bsr	ldirxu
+	rts
+
+endirq	leax	svfirq,pcr
+	ldu	#FIRQHK
+	ldb	#3
+	bsr	ldirxu
+	rts
+
+ldirxu	lda	,x+
+	sta	,u+
+	decb
+	bne	ldirxu
+	rts
+
+jpfirq	jmp	firq
+firq	pshs	a
+	lda	BREAK
+	anda	#$02
+	sta	runing,pcr
+	puls	a
+	rti
+
+; IN: X=destination address
+;OUT: A=data, X=X+1, CF is set if BREAK is pressed
+recvb
+recvb0	lda	runing,pcr
+	beq	recvb1
+	lda	FT245B
+	bmi	recvb0
+	ldb	#1
+	bsr	recvb2
+	lsla
+	sta	,x
+	bsr	recvb2
+	anda	#$7f
+	ora	,x
+	sta	,x+
+	andcc	#$fa	;reset zero and carry
+	rts
+recvb1	orcc	#$01	;set carry
+	rts
+recvb2	stb	FT245A
+	lda	FT245B
+	clr	FT245A
+	rts
+
+svfirq	equ	*
+runing	equ	svfirq+3
+
+	end

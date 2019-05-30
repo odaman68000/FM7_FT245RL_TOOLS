@@ -1,0 +1,210 @@
+;********************************************************
+; BUBEMUL: FT245RL BUBR filesystem emulation
+; Copyright (C) 2019 by odaman68000. All rights reserved.
+;********************************************************
+
+
+TEXTAD	equ	$0033
+VARAD	equ	$0035
+USERAD	equ	$0045
+NUMRES	equ	$004b	;ASCII-LOAD
+ISFILE	equ	$00bf	;ASCII-LOAD
+GETCHR	equ	$00d2
+GETCH1	equ	$00d8
+BUFPO	equ	$00d9	;ASCII-LOAD
+BASBUF	equ	$033a	;ASCII-LOAD
+TXTBUF	equ	$043d	;ASCII-LOAD
+SYSTAD	equ	$059d
+GPBUBR	equ	$05d9
+READY_	equ	$8e72
+NEW1_	equ	$8f39
+TRNNUM	equ	$9162	;ASCII-LOAD
+SYERR_	equ	$92a0
+CRLF1_	equ	$9b47
+TRNA2B	equ	$c28c	;ASCII-LOAD
+OUTCH_	equ	$d08e
+BIOENT	equ	$fbfa
+
+FT2TRN	equ	$fc00
+RECV	equ	$fc06
+SEND	equ	$fc13
+SENDBX	equ	$fc2b
+SENDB	equ	$fc32
+RECVBX	equ	$fc42
+RECVB	equ	$fc47
+FT2WRK	equ	$fc77
+
+	org	$6809
+
+; transfer FT245TRN to $FC00
+start	leax	trn,pcr
+	ldu	#FT2TRN
+	ldb	#trn0-trn
+start0	lda	,x+
+	sta	,u+
+	decb
+	bne	start0
+
+	ldx	SYSTAD
+	leax	bubr-endbub-2,x
+	stx	USERAD
+	stx	SYSTAD
+	leax	2,x
+	stx	start3+1,pcr
+	ldy	#endbub-bubr
+	leau	bubr,pcr
+start1	lda	,u+
+	sta	,x+
+	leay	-1,y
+	bne	start1
+
+	leax	start3,pcr
+	ldu	#GPBUBR
+	ldb	#3
+start2	lda	,x+
+	sta	,u+
+	decb
+	bne	start2
+	jmp	NEW1_
+
+start3	jmp	bubr
+
+trn	includebin	"FT245TRN"
+trn0
+
+bubr
+;send command line
+	jsr	GETCH1
+	beq	bubr1
+	cmpa	#':'
+	beq	bubr1
+bubr0	jsr	SENDB
+	jsr	GETCHR
+	beq	bubr1
+	cmpa	#':'
+	bne	bubr0
+bubr1	clra
+	jsr	SENDB
+
+; get command response
+	jsr	RECVB
+
+; go to command processor
+	ldx	#FT2TRN
+	leau	bubrtb,pcr
+	lsla
+	ldd	a,u
+	jmp	d,u
+bubrtb	fdb	error-bubrtb	;0
+	fdb	print-bubrtb	;1
+	fdb	save-bubrtb	;2
+	fdb	savem-bubrtb	;3
+	fdb	load-bubrtb	;4
+	fdb	loada-bubrtb	;5
+	fdb	loadm-bubrtb	;6
+
+rh	ldb	#6
+rh0	jsr	RECVBX
+	decb
+	bne	rh0
+	rts
+
+error	jmp	SYERR_
+
+print	jsr	RECVB
+	cmpa	#$1a
+	beq	print0
+	ldx	#FT2WRK
+	sta	,x
+	lda	#$14
+	sta	1,x
+	stx	3,x
+	ldd	#$0001
+	std	5,x
+	leax	1,x
+	jsr	[BIOENT]
+	bra	print
+print0	jmp	READY_
+
+save	ldu	TEXTAD
+	stu	,x++
+	ldu	VARAD
+	stu	,x
+	jsr	SEND
+	jmp	READY_
+
+savem	bsr	rh
+	jsr	SEND
+	jmp	READY_
+
+load	bsr	rh
+	ldd	TEXTAD
+	tfr	d,x
+	addd	FT2TRN+2
+	std	VARAD
+load0	jsr	RECVBX
+	cmpx	VARAD
+	bne	load0
+	jmp	READY_
+
+loadm	jsr	RECV
+	jmp	READY_
+
+loada	orcc	#$50
+	clra
+	clrb
+	ldx	TEXTAD
+	std	,x++
+	stx	VARAD
+loada0	jsr	RECVB
+	cmpa	#$1a
+	beq	loada4
+	cmpa	#$20
+	bcs	loada0
+	ldx	#TXTBUF
+loada1	sta	,x+
+	jsr	RECVB
+	cmpa	#$20
+	bcc	loada1
+	clr	,x
+	ldx	#TXTBUF
+
+	pshs	a,u
+	lda	,x
+	cmpa	#'0'
+	bcs	loada3
+	cmpa	#'9'+1
+	bcc	loada3
+	stx	BUFPO
+	jsr	TRNNUM
+	ldd	NUMRES
+	std	BASBUF
+	lda	#$01
+	sta	ISFILE
+	jsr	TRNA2B
+	ldx	VARAD
+	leax	-2,x
+	tfr	x,u
+	leax	d,x
+	stx	,u++
+	subd	#2
+	ldx	#BASBUF
+loada2	lda	,x+
+	sta	,u+
+	subd	#1
+	bne	loada2
+	clra
+	clrb
+	std	,u++
+	stu	VARAD
+	std	,u++
+loada3	puls	a,u
+
+	cmpa	#$1a
+	bne	loada0
+loada4	andcc	#$af
+	jmp	READY_
+
+endbub
+
+	end
