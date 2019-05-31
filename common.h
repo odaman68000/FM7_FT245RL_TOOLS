@@ -17,7 +17,7 @@
 
 //#define DEBUG	1
 
-#ifdef LINUX
+#ifdef __linux__
 #define SERIAL_PORT		"/dev/ttyUSB0"
 #else
 #define SERIAL_PORT		"/dev/cu.usbserial-A104B2QE"
