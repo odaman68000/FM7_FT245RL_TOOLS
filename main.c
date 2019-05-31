@@ -49,12 +49,12 @@ static void usage(void) {
 	printf("    - Receive data from FM-8/7/77.\n");
 	printf("      (with FT245TRN)\n");
 	printf(" DRIVE-EMULATION:\n");
-	printf("  d77emul filename.D77\n");
-	printf("    - FD simulation on FM-7 with D77 disk image.\n");
-	printf("      (with DRVEMUL)\n");
 	printf("  bubemul directory\n");
 	printf("    - Special BUBR command filesystem emulation.\n");
 	printf("      (with BUBEMUL)\n");
+	printf("  d77emul filename.D77\n");
+	printf("    - FD simulation on FM-7 with D77 disk image.\n");
+	printf("      (with DRVEMUL)\n");
 }
 
 static int rawsend(int fd, int argc, const char **argv) {
