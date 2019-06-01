@@ -370,7 +370,7 @@ int open_serial_device(int baudRate) {
 	tio.c_cc[VMIN] = 1;
 	tio.c_cc[VTIME] = 0;
 	tcsetattr( fd, TCSANOW, &tio );     // デバイスに設定を行う
-#ifdef LINUX
+#ifdef __linux__
 	ioctl(fd, TCSETS, &tio);            // ポートの設定を有効にする
 #endif
 	return fd;
