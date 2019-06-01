@@ -45,7 +45,7 @@ static int get_fm7_int(unsigned char *buffer) {
 	}
 	if (*(buffer + 0) == '&' && (*(buffer + 1) & 0xdf) == 'H')
 		return flag * htoi((char *)buffer + 2);
-	return -6809;
+	return -65536;
 }
 
 static int get_basic_header(unsigned char *data, unsigned long size, BAS_HEADER **header, unsigned char **body, unsigned long *body_size, BAS_FOOTER **footer) {
@@ -274,7 +274,7 @@ int emul_bub(int fd, const char *dirname) {
 			}
 			continue;
 		} else if (*(values[0] + 0) == 0xab) {	//LOAD
-			unsigned int p1 = 0, p2 = 0;
+			int p1 = 0, p2 = 0;
 			if ((*(values[0] + 1) & 0xdf) == 'M')		//LOADM
 				binary = 1;
 			else if ((*(values[0] + 1) & 0xdf) == 'R')	//LOADR
@@ -304,7 +304,7 @@ int emul_bub(int fd, const char *dirname) {
 					//BUBR LOADM "filename",&Hoffset,R
 					if (vcnt > 2)
 						p2 = ((*values[2] & 0xdf) == 'R');
-					if (p1 > 0xffff || p1 < -0xffff) {
+					if (p1 > 65535 || p1 < -65535) {
 						block_write_string_result(fd, "Address range is invalid.");
 						continue;
 					}
