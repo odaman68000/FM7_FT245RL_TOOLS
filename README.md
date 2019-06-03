@@ -72,7 +72,6 @@ PC(Linux) / Mac 側では以下のようにしてサーバプログラムを起�
 # ft245tools d77emul [.D77 filename]
 ```
 
-* `BUBR LOAD "Filename"` : アスキーセーブされた BASIC プログラムの読込み (Experimental)
 これ以降は ドライブ 0: に対する全てのアクセスが、PC(Linux)/Mac上の D77 へとリダイレクトされます。  
 ただ現状は Experimental という事で、FM-7側からいくらセクター情報を書き換えても PC(Linux)/Mac上でメモリ上記憶するだけで、D77ファイル自体の書き換えや更新は行いません。
 
