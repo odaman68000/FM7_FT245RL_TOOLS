@@ -182,9 +182,12 @@ static void sig_action(int sig, siginfo_t *info, void *ctx) {
 
 static void signal_setting(void) {
 	struct sigaction sig;
+	sigset_t sigset;
+	int res = sigemptyset(&sigset);
 	memset(&sig, 0, sizeof(sig));
 	sig.sa_sigaction = sig_action;
-	sig.sa_mask = 0;
+	if (res >= 0)
+		sig.sa_mask = sigset;
 	sig.sa_flags = SA_SIGINFO;
 	sigaction(SIGINT, &sig, NULL);
 	sigaction(SIGHUP, &sig, NULL);
