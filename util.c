@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <signal.h>
+#include <arpa/inet.h>
 
 #pragma pack(1)
 
