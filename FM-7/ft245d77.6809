@@ -42,7 +42,7 @@ pctofm	lbsr	init
 fmtopc	rts
 
 main0	fcb	"FT245D77 version 1.0",$0d,$0a
-	fcb	"Copyright 2019 by Tetsuo Oda.",$0d,$0a,$0d,$0a
+	fcb	"Copyright 2019 by odaman68000. All rights reserved.",$0d,$0a,$0d,$0a
 	fcb	"BREAK key to stop receiving.",$0d,$0a,$0d,$0a,$00
 main1	fcb	"Receiving:",$00
 main2	fcb	" Cluster #",$00
@@ -128,13 +128,10 @@ rcvse0	pshs	b
 	ldd	-2,x
 	exg	a,b
 	std	-2,x
-	tfr	d,u
-rcvse1	pshs	u
-	lbsr	recvb
-	puls	u
+	tfr	d,y
+rcvse1	lbsr	recvb
 	bcs	rcvse2
-	leau	-1,u
-	cmpu	#0
+	leay	-1,y
 	bne	rcvse1
 	andcc	#$fa		;reset ZF,CF
 	rts
