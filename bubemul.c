@@ -31,6 +31,11 @@
 
 #include "common.h"
 
+#define ERROR_ILLEGAL_FILE_MODE		"Illegal file mode."
+#define ERROR_ADDRESS_RANGE_INVALID	"Address range is invalid."
+#define ERROR_DIR_ACCESS			"Directory access error."
+#define ERROR_FILE_NOT_FOUND		"File not found."
+
 //FM-7で扱われる2バイト値を変換
 //  $fe02xxxx     : F-BASIC 2バイト整数
 //  $2648aabbccdd : "&Habcd" 16進数
@@ -120,7 +125,7 @@ static int emul_bub_load(int fd, const char *pathname) {
 		BIN_FOOTER *bin_footer;
 		unsigned char *bin_body = NULL;
 		if (get_binary_header(buffer, size, &bin_header, &bin_body, &bin_footer) == 0) {
-			block_write_string_result(fd, "Illegal file mode.");
+			block_write_string_result(fd, ERROR_ILLEGAL_FILE_MODE);
 			goto error;
 		}
 		*(buffer + size + 1) = '\0';
@@ -186,7 +191,7 @@ static int emul_bub_loadm(int fd, const char *pathname, int offset, int exec) {
 	if ((buffer = get_file_image(pathname, &size)) == NULL)
 		goto error;
 	if (get_binary_header(buffer, size, &header, &body, &footer) != 0) {
-		block_write_string_result(fd, "Illegal file mode.");
+		block_write_string_result(fd, ERROR_ILLEGAL_FILE_MODE);
 		goto error;
 	}
 	block_write_byte(fd, CMD_LOADM);
@@ -267,7 +272,7 @@ int emul_bub(int fd, const char *dirname) {
 				p2 = get_fm7_int(values[2]);
 				p3 = get_fm7_int(values[3]);
 				if ((p1 < 0 || p1 > 0xffff) || (p2 < 0 || p2 > 0xffff) || (p3 < 0 || p3 > 0xffff)) {
-					block_write_string_result(fd, "Address range is invalid.");
+					block_write_string_result(fd, ERROR_ADDRESS_RANGE_INVALID);
 					continue;
 				}
 				printf("SAVEM \"%s\",&H%04X,&H%04X,&H%04X\n", filename, p1, p2, p3);
@@ -288,7 +293,7 @@ int emul_bub(int fd, const char *dirname) {
 			sprintf(pathname, "%s/%s", dirname, filename);
 			if (!is_file(pathname)) {
 				printf("LOAD%s \"%s\" : File not found.\n", binary ? "M" : "", filename);
-				block_write_string_result(fd, "File not found.");
+				block_write_string_result(fd, ERROR_FILE_NOT_FOUND);
 				continue;
 			}
 			if (!binary) {
@@ -306,7 +311,7 @@ int emul_bub(int fd, const char *dirname) {
 					if (vcnt > 2)
 						p2 = ((*values[2] & 0xdf) == 'R');
 					if (p1 > 65535 || p1 < -65535) {
-						block_write_string_result(fd, "Address range is invalid.");
+						block_write_string_result(fd, ERROR_ADDRESS_RANGE_INVALID);
 						continue;
 					}
 					printf("LOADM \"%s\",&H%04X%s\n", filename, p1, p2 ? ",R" : "");
@@ -324,7 +329,7 @@ int emul_bub(int fd, const char *dirname) {
 					if (vcnt > 3)
 						p3 = (*values[3] & 0xdf) == 'N';
 					if ((p1 < 0 || p1 > 0xffff) || (p2 < 0 || p2 > 0xffff)) {
-						block_write_string_result(fd, "Address range is invalid.");
+						block_write_string_result(fd, ERROR_ADDRESS_RANGE_INVALID);
 						continue;
 					}
 					printf("LOADR \"%s\",$%04X,$%04X%s\n", filename, p1, p2, p3 ? ",N" : "");
@@ -337,7 +342,7 @@ int emul_bub(int fd, const char *dirname) {
 			struct dirent *e = NULL;
 			printf("FILES\n");
 			if ((dir = opendir(dirname)) == NULL) {
-				block_write_string_result(fd, "Directory access error.");
+				block_write_string_result(fd, ERROR_DIR_ACCESS);
 				continue;
 			}
 			block_write_byte(fd, CMD_PRINT);
