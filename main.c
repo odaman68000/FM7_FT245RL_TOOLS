@@ -43,7 +43,7 @@ static void usage(void) {
 	printf("    - Send data to specified destination address, and automatic exec.\n");
 	printf("      (with FT245TRN)\n");
 	printf("  d77send filename.D77\n");
-	printf("    - Send D77 image data and write it to FD.å\n");
+	printf("    - Send D77 image data and write it to FD.\n");
 	printf("      (with FT245D77)\n");
 	printf(" RECEIVE:\n");
 	printf("  binrecv filename.*\n");
@@ -132,6 +132,9 @@ static int d77send(int fd, int argc, const char **argv) {
 		printf("Error: failed to send disk image.\n");
 		return 1;
 	}
+	printf("Completed. (CTRL-C to quit)\n");
+	char b[1];
+	block_read(fd, b, 1);
 	return 0;
 }
 
@@ -212,7 +215,7 @@ int main(int argc, const char *argv[]) {
 	};
 
 	printf("ft245tools Version 1.0\n");
-	printf("Copyright (C) 2019 by odaman68000.\n\n");
+	printf("Copyright (C) 2019 by odaman68000. All rights reserved.\n\n");
 
 	signal_setting();
 

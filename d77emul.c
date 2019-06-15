@@ -53,24 +53,18 @@ int send_d77(int fd, const char *filename) {
 		if ((len = fread(secdat, 1, header.size, fp)) < header.size)
 			goto error;
 		//物理セクタ情報を送る
-		if (block_write(fd, (unsigned char *)&header, sizeof(header)) < 0)
+		printf("Track: %d, Sector: %d, Side: %d\n", header.track, header.sector, header.side);
+		if (block_write(fd, &header, sizeof(header)) < 0)
 			printf("block_write() failed. (%d)\n", errno);
-		//セクタの内容を送る(64 × 4 = 256 bytes)
-		//FM-7側では, 物理セクタ情報にある通りのバイト数(256)を受信して, 物理セクタ情報にある
-		//通りのTrack, Side, Sectorにそのデータを書き込む
-		for (int i = 0; i < header.size; i += FT245RL_BLOCK)
-			if (block_write(fd, secdat + i, FT245RL_BLOCK) < 0)
-				printf("block_write() failed. (%d)\n", errno);
+		if (block_write(fd, secdat, header.size) < 0)
+			printf("block_write() failed. (%d)\n", errno);
 	}
 	secdat[0] = 0xff;			// for EOF
 	block_write(fd, secdat, 1);
 	ret = 0;
-	printf("Completed. (CTRL-C to quit)\n");
 error:
 	if (fp != NULL)
 		fclose(fp);
-	if (ret == 0)
-		block_read(fd, secdat, sizeof(secdat));
 	return ret;
 }
 
