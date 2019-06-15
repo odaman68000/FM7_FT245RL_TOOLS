@@ -69,8 +69,8 @@ static int serial_write(int fd, unsigned char *buffer, int size) {
 static int send_block(int fd, const unsigned char *block, int len) {
 	unsigned char send_buf[FT245RL_BLOCK * 2];
 	for (int i = 0; i < len; i++) {
-		send_buf[i * 2 + 0] = block[i] >> 1;	// 上位7ビットは1ビット右シフトしコピー
 		send_buf[i * 2 + 1] = block[i];			// 下位7ビットはそのままコピー
+		send_buf[i * 2 + 0] = block[i] >> 1;	// 上位7ビットは1ビット右シフトしコピー
 	}
 	return serial_write(fd, send_buf, len * 2);
 }
@@ -334,7 +334,7 @@ int recv_mem(int fd, void *buffer) {
 #endif
 	info.start = ntohs(info.start);
 	info.bottom = ntohs(info.bottom);
-	size = (unsigned short)info.bottom - (unsigned short)info.start;
+	size = info.bottom + (info.bottom < info.start ? 0x10000 : 0) - info.start;
 	if ((len = block_read(fd, buffer, size)) < 0)
 		return -1;
 #ifdef DEBUG
