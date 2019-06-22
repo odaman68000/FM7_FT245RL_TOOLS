@@ -16,22 +16,27 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/ioctl.h>
+#include <signal.h>
 #include <fcntl.h>
+#ifdef WIN32
+#include <Windows.h>
+#include <io.h>
+#else
+#include <sys/param.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 #include <dirent.h>
-#include <signal.h>
 #include <arpa/inet.h>
+#endif
 
 #pragma pack(1)
 
 #include "common.h"
 
-static volatile int fd = -1;
+static volatile HANDLE fd = INVALID_HANDLE_VALUE;
 
 static void usage(void) {
 	printf("Usage: ft245tools COMMAND [Parameters]\n");
@@ -58,7 +63,7 @@ static void usage(void) {
 	printf("      (with DRVEMUL)\n");
 }
 
-static int rawsend(int fd, int argc, const char **argv) {
+static int rawsend(HANDLE fd, int argc, const char **argv) {
 	printf("Send as binary: ");
 	if (argc < 3) {
 		printf("File name is not specified.\n");
@@ -75,7 +80,7 @@ static int rawsend(int fd, int argc, const char **argv) {
 	return 0;
 }
 
-static int binsend(int fd, int argc, const char **argv) {
+static int binsend(HANDLE fd, int argc, const char **argv) {
 	printf("Send as binary: ");
 	int start = 0, exec = 0, sent = 0;
 	if (argc < 3) {
@@ -102,7 +107,7 @@ static int binsend(int fd, int argc, const char **argv) {
 	return 0;
 }
 
-static int binrecv(int fd, int argc, const char **argv) {
+static int binrecv(HANDLE fd, int argc, const char **argv) {
 	int size = 0;
 	printf("Receive as binary: ");
 	if (argc < 3) {
@@ -121,7 +126,7 @@ static int binrecv(int fd, int argc, const char **argv) {
 	return 0;
 }
 
-static int d77send(int fd, int argc, const char **argv) {
+static int d77send(HANDLE fd, int argc, const char **argv) {
 	printf("Send as D77 disk image: ");
 	if (argc < 3) {
 		printf("File name is not specified.\n");
@@ -138,7 +143,7 @@ static int d77send(int fd, int argc, const char **argv) {
 	return 0;
 }
 
-static int d77emul(int fd, int argc, const char **argv) {
+static int d77emul(HANDLE fd, int argc, const char **argv) {
 	printf("D77 disk emulation: ");
 	if (argc < 3) {
 		printf("File name is not specified.\n");
@@ -158,7 +163,7 @@ static int d77emul(int fd, int argc, const char **argv) {
 	return 0;
 }
 
-static int bubemul(int fd, int argc, const char **argv) {
+static int bubemul(HANDLE fd, int argc, const char **argv) {
 	printf("BUBR command filesystem emulation: ");
 	if (argc < 3) {
 		printf("Base directory path is not specified.\n");
@@ -177,6 +182,7 @@ static int bubemul(int fd, int argc, const char **argv) {
 	return 0;
 }
 
+#ifndef WIN32
 static void sig_action(int sig, siginfo_t *info, void *ctx) {
 	if (fd >= 0)
 		close(fd);
@@ -198,12 +204,13 @@ static void signal_setting(void) {
 	sigaction(SIGQUIT, &sig, NULL);
 	sigaction(SIGKILL, &sig, NULL);
 }
+#endif
 
 int main(int argc, const char *argv[]) {
 	int ret = 1;
 	struct {
 		const char *command;
-		int (*func)(int, int, const char **);
+		int (*func)(HANDLE, int, const char **);
 	} *cmd = NULL, cmdtbl[] = {
 		{ "rawsend", rawsend },
 		{ "binsend", binsend },
@@ -217,7 +224,9 @@ int main(int argc, const char *argv[]) {
 	printf("ft245tools Version 1.0\n");
 	printf("Copyright (C) 2019 by odaman68000. All rights reserved.\n\n");
 
+#ifndef WIN32
 	signal_setting();
+#endif
 
 	if (argc < 2) {
 		usage();
@@ -232,7 +241,7 @@ int main(int argc, const char *argv[]) {
 		usage();
 		goto error;
 	}
-	if ((fd = open_serial_device(B38400)) < 0) {	// デバイスをオープンする
+	if ((fd = open_serial_device(B38400)) == INVALID_HANDLE_VALUE) {	// デバイスをオープンする
         printf("Error: serial device open error.\n");
 		goto error;
     }
@@ -240,8 +249,8 @@ int main(int argc, const char *argv[]) {
 	if ((ret = cmd->func(fd, argc, argv)) < 0)
 		usage();
 error:
-	if (fd >= 0)
+	if (fd != INVALID_HANDLE_VALUE)
 		close(fd);									// デバイスのクローズ
-	fd = -1;
+	fd = INVALID_HANDLE_VALUE;
     return ret < 0 ? -ret : ret;
 }

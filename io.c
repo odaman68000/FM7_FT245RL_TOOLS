@@ -16,23 +16,44 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/ioctl.h>
+#include <signal.h>
 #include <fcntl.h>
+#ifdef WIN32
+#include <Windows.h>
+#include <io.h>
+#else
+#include <sys/param.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 #include <dirent.h>
-#include <signal.h>
 #include <arpa/inet.h>
+#endif
 
 #pragma pack(1)
 
 #include "common.h"
 
+#ifdef WIN32
+int read_win32(HANDLE fd, void *buffer, int size) {
+	int length = 0;
+	if (!ReadFile(fd, buffer, size, &length, NULL))
+		return -1;
+	return length;
+}
+
+int write_win32(HANDLE fd, void *buffer, int size) {
+	int length = 0;
+	if (!WriteFile(fd, buffer, size, &length, NULL))
+		return -1;
+	return length;
+}
+#endif
+
 //シリアルポートからの read() ユーティリティ
-static int serial_read(int fd, void *buffer, int size) {
+static int serial_read(HANDLE fd, void *buffer, int size) {
 	int len = -1, total;
 	for (total = 0; total < size; total += len)
 		for (len = -1; len < 0; ) {
@@ -44,14 +65,14 @@ static int serial_read(int fd, void *buffer, int size) {
 				return len;
 			}
 #if DEBUG
-			printf("serial_read(): read() %d\n", len);
+			//printf("serial_read(): read() %d\n", len);
 #endif
 		}
 	return total;
 }
 
 //シリアルポートへの write() ユーティリティ
-static int serial_write(int fd, unsigned char *buffer, int size) {
+static int serial_write(HANDLE fd, unsigned char *buffer, int size) {
 	int len = -1, total;
 	for (total = 0; total < size; total += len)
 		for (len = -1; len < 0; )
@@ -66,7 +87,7 @@ static int serial_write(int fd, unsigned char *buffer, int size) {
 }
 
 //FT245RLに対してデータを送信する
-static int send_block(int fd, const unsigned char *block, int len) {
+static int send_block(HANDLE fd, const unsigned char *block, int len) {
 	unsigned char send_buf[FT245RL_BLOCK * 2];
 	for (int i = 0; i < len; i++) {
 		send_buf[i * 2 + 1] = block[i];			// 下位7ビットはそのままコピー
@@ -76,7 +97,7 @@ static int send_block(int fd, const unsigned char *block, int len) {
 }
 
 //シリアルポートからの null-terminated 文字列受信ユーティリティ
-int serial_read_string(int fd, char *buffer, int length) {
+int serial_read_string(HANDLE fd, char *buffer, int length) {
 	int d, l = 0, eos = 0;
 	char c[1], *po = NULL;
 #ifdef DEBUG
@@ -105,7 +126,7 @@ int serial_read_string(int fd, char *buffer, int length) {
 }
 
 //シリアルポートへの read() ユーティリティ
-int block_read(int fd, void *data, int len) {
+int block_read(HANDLE fd, void *data, int len) {
 	int received = 0, bs = 0;
 	for (received = 0; received < len; received += bs)
 		if ((bs = serial_read(fd, (unsigned char *)data + received, MIN(FT245RL_BLOCK, len - received))) < 0)
@@ -117,7 +138,7 @@ int block_read(int fd, void *data, int len) {
 }
 
 //シリアルポートへの write() ユーティリティ
-int block_write(int fd, const void *data, int len) {
+int block_write(HANDLE fd, const void *data, int len) {
 	int sent = 0, bs = 0;
 	for (sent = 0; sent < len; sent += bs)
 		if (send_block(fd, (unsigned char *)data + sent, (bs = MIN(FT245RL_BLOCK, len - sent))) < 0)
@@ -129,17 +150,17 @@ int block_write(int fd, const void *data, int len) {
 }
 
 //シリアルポートへの write() ユーティリティ
-int block_write_byte(int fd, int d) {
+int block_write_byte(HANDLE fd, int d) {
 	unsigned char c[1];
 	c[0] = d;
 	return send_block(fd, c, 1);
 }
 
 //シリアルポートへの null-terminated 文字列送信ユーティリティ
-int block_write_string(int fd, const char *string) {
+int block_write_string(HANDLE fd, const char *string) {
 	static char *buffer = NULL;
 	static int size = -1;
-	if (buffer == NULL || size < strlen(string) + 2) {
+	if (buffer == NULL || size < (int)(strlen(string) + 2)) {
 		if (buffer != NULL)
 			free(buffer);
 		size = strlen(string) + 2;
@@ -153,7 +174,7 @@ int block_write_string(int fd, const char *string) {
 	return block_write(fd, buffer, strlen(buffer));
 }
 
-int block_write_string_result(int fd, const char *message) {
+int block_write_string_result(HANDLE fd, const char *message) {
 	block_write_byte(fd, CMD_PRINT);
 	return block_write_string(fd, message);
 }
@@ -248,7 +269,7 @@ int put_file_image(const char *filename, const unsigned char *data, unsigned lon
 	return ret;
 }
 
-int send_mem(int fd, const void *buffer, int length, unsigned int st, unsigned int ex) {
+int send_mem(HANDLE fd, const void *buffer, int length, unsigned int st, unsigned int ex) {
 	int sent;
 	if (st >= 0) {
 		FILEINFO info;
@@ -266,7 +287,7 @@ int send_mem(int fd, const void *buffer, int length, unsigned int st, unsigned i
 	return sent;
 }
 
-int send_file(int fd, const char *filename, unsigned int start, unsigned int exec) {
+int send_file(HANDLE fd, const char *filename, unsigned int start, unsigned int exec) {
 	FILE *fp = NULL;
 	char block[4096];
 	int ret = 1, len = 0;
@@ -277,7 +298,7 @@ int send_file(int fd, const char *filename, unsigned int start, unsigned int exe
 		FILEINFO info;
 		fseek(fp, 0, SEEK_END);
 		info.start = htons(start);
-		info.bottom = htons(start + ftell(fp));
+		info.bottom = htons((u_short)(start + ftell(fp)));
 		info.exec = htons(exec);
 		fseek(fp, 0, SEEK_SET);
 #ifdef DEBUG
@@ -299,7 +320,7 @@ error:
 	return ret;
 }
 
-static int recv_mem_chunked(int fd, void *buffer, unsigned int st, unsigned int ed) {
+static int recv_mem_chunked(HANDLE fd, void *buffer, unsigned int st, unsigned int ed) {
 	FILEINFO info, info_n, info_r;
 	const unsigned int length = ed - st + 1;
 	unsigned int sent = 0, bs = 0;
@@ -325,9 +346,9 @@ static int recv_mem_chunked(int fd, void *buffer, unsigned int st, unsigned int 
 	return sent;
 }
 
-int recv_mem(int fd, void *buffer) {
+int recv_mem(HANDLE fd, void *buffer) {
 	FILEINFO info;
-	int len = 0, r, size;
+	int len = 0, size;
 	block_read(fd, &info, sizeof(info));
 #ifdef DEBUG
 	dump(&info, sizeof(info));
@@ -343,7 +364,7 @@ int recv_mem(int fd, void *buffer) {
 	return size;
 }
 
-int recv_file(int fd, const char *filename) {
+int recv_file(HANDLE fd, const char *filename) {
 	unsigned char buffer[MAX16BIT];
 	int len;
 	if ((len = recv_mem(fd, buffer)) < 0)
@@ -352,11 +373,37 @@ int recv_file(int fd, const char *filename) {
 }
 
 //シリアルデバイスのオープン
-int open_serial_device(int baudRate) {
-	int fd;								// ファイルディスクリプタ
+HANDLE open_serial_device(int baudRate) {
+	HANDLE fd;
+#ifdef WIN32
+	DCB dcb;
+	if ((fd = CreateFile(SERIAL_PORT, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL)) == INVALID_HANDLE_VALUE)
+		goto error;
+	if (!GetCommState(fd, &dcb))
+		goto error;
+	dcb.BaudRate = baudRate;
+	dcb.ByteSize = 8;
+	dcb.StopBits = 0;	//0,1,2 = 1,1.5,2
+	dcb.Parity = 0;		//0,1,2,3,4 = None, Even, Odd, Skip
+	dcb.fParity = FALSE;
+	dcb.fBinary = TRUE;
+	dcb.fOutxCtsFlow = FALSE;
+	dcb.fOutxDsrFlow = FALSE;
+	dcb.fDtrControl = FALSE;
+	dcb.fRtsControl = FALSE;
+	dcb.fInX = FALSE;
+	dcb.fOutX = FALSE;
+	dcb.fTXContinueOnXoff = FALSE;
+	if (SetCommState(fd, &dcb))
+		return fd;
+error:
+	if (fd != INVALID_HANDLE_VALUE)
+		CloseHandle(fd);
+	return INVALID_HANDLE_VALUE;
+#else
 	struct termios tio;					// シリアル通信設定
 	if ((fd = open(SERIAL_PORT, O_RDWR|O_NOCTTY)) < 0)	// デバイスをオープンする
-		return -1;
+		return INVALID_HANDLE_VALUE;
 	tcgetattr( fd, &tio );
 	cfmakeraw( &tio );					// RAWモード
 	cfsetspeed( &tio, baudRate );
@@ -375,4 +422,5 @@ int open_serial_device(int baudRate) {
 	ioctl(fd, TCSETS, &tio);            // ポートの設定を有効にする
 #endif
 	return fd;
+#endif
 }

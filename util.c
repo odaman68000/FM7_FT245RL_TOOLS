@@ -16,16 +16,21 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/ioctl.h>
+#include <signal.h>
 #include <fcntl.h>
+#ifdef WIN32
+#include <Windows.h>
+#include <io.h>
+#else
+#include <sys/param.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 #include <dirent.h>
-#include <signal.h>
 #include <arpa/inet.h>
+#endif
 
 #pragma pack(1)
 
@@ -65,7 +70,7 @@ int is_file(const char *path) {
 
 int is_file_in_path(const char *file, const char *path) {
 	char pathname[PATH_MAX];
-	sprintf(pathname, "%s/%s", path, file);
+	sprintf(pathname, "%s%c%s", path, PATH_SEPARATOR, file);
 	return is_file(pathname);
 }
 

@@ -16,22 +16,27 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/ioctl.h>
+#include <signal.h>
 #include <fcntl.h>
+#ifdef WIN32
+#include <Windows.h>
+#include <io.h>
+#else
+#include <sys/param.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 #include <dirent.h>
-#include <signal.h>
 #include <arpa/inet.h>
+#endif
 
 #pragma pack(1)
 
 #include "common.h"
 
-int send_d77(int fd, const char *filename) {
+int send_d77(HANDLE fd, const char *filename) {
 	FILE *fp = NULL;
 	D77_SECTOR_DATA header;
 	unsigned char secdat[256];
@@ -68,12 +73,12 @@ error:
 	return ret;
 }
 
-int emul_d77(int fd, const char *filename1, const char *filename2) {
+int emul_d77(HANDLE fd, const char *filename1, const char *filename2) {
 	RCB_DATA rcb;
 	void *image[2];
 	unsigned char secdat[256];
 	unsigned long filesize[2];
-	int ret = 1, len, size, is_write, index, sector;
+	int ret = 1, len, is_write, index, sector;
 	image[0] = image[1] = NULL;
 	if ((image[0] = get_file_image(filename1, &filesize[0])) == NULL)
 		goto error;

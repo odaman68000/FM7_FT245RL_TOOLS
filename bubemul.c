@@ -16,16 +16,21 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/ioctl.h>
+#include <signal.h>
 #include <fcntl.h>
+#ifdef WIN32
+#include <Windows.h>
+#include <io.h>
+#else
+#include <sys/param.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 #include <dirent.h>
-#include <signal.h>
 #include <arpa/inet.h>
+#endif
 
 #pragma pack(1)
 
@@ -34,7 +39,7 @@
 #define ERROR_ILLEGAL_FILE_MODE		"Illegal file mode."
 #define ERROR_ADDRESS_RANGE_INVALID	"Address range is invalid."
 #define ERROR_DIR_ACCESS			"Directory access error."
-#define ERROR_FILE_NOT_FOUND		"File not found."
+#define ERROR_FILE_DOES_NOT_FOUND	"File not found."
 
 //FM-7で扱われる2バイト値を変換
 //  $fe02xxxx     : F-BASIC 2バイト整数
@@ -89,7 +94,7 @@ static int get_binary_header(unsigned char *data, unsigned long size, BIN_HEADER
 //F-BASIC ファイルを受信して保存する
 //BUBR SAVE "filename"
 //BUBR SAVE "filename",A
-static int emul_bub_save(int fd, const char *pathname) {
+static int emul_bub_save(HANDLE fd, const char *pathname) {
 	int len;
 	struct {
 		BAS_HEADER header;
@@ -107,7 +112,7 @@ static int emul_bub_save(int fd, const char *pathname) {
 
 //F-BASIC ファイルをファイルから読み込んで FM-7 に送信
 //BUBR LOAD "filename"
-static int emul_bub_load(int fd, const char *pathname) {
+static int emul_bub_load(HANDLE fd, const char *pathname) {
 	int ret = -1;
 	unsigned long size, body_size;
 	BAS_HEADER *header;
@@ -146,7 +151,7 @@ error:
 
 //バイナリを受信して保存する
 //BUBR SAVEM "filename",Start,End,Exec
-static int emul_bub_savem(int fd, const char *pathname, int st, int ed, int ex) {
+static int emul_bub_savem(HANDLE fd, const char *pathname, int st, int ed, int ex) {
 	int len;
 	FILEINFO info;
 	struct {
@@ -178,16 +183,12 @@ static int emul_bub_savem(int fd, const char *pathname, int st, int ed, int ex) 
 //BUBR LOADM "filename"
 //BUBR LOADM "filename",&Hoffset
 //BUBR LOADM "filename",&Hoffset,R
-static int emul_bub_loadm(int fd, const char *pathname, int offset, int exec) {
+static int emul_bub_loadm(HANDLE fd, const char *pathname, int offset, int exec) {
 	int ret = -1;
 	unsigned long size;
 	BIN_HEADER *header;
 	BIN_FOOTER *footer;
 	unsigned char *buffer = NULL, *body = NULL;
-	struct binary_image {
-		BIN_HEADER header;
-		unsigned char body[MAX16BIT];
-	} *data;
 	if ((buffer = get_file_image(pathname, &size)) == NULL)
 		goto error;
 	if (get_binary_header(buffer, size, &header, &body, &footer) != 0) {
@@ -208,7 +209,7 @@ error:
 //BUBR LOADR "filename",&Hstart,N
 //BUBR LOADR "filename",&Hstart,&Hexec
 //BUBR LOADR "filename",&Hstart,&Hexec,N
-static int emul_bub_loadr(int fd, const char *pathname, int st, int ex, int without_header) {
+static int emul_bub_loadr(HANDLE fd, const char *pathname, int st, int ex, int without_header) {
 	int ret = -1;
 	unsigned long size;
 	BIN_HEADER *header;
@@ -227,16 +228,16 @@ error:
 	return ret;
 }
 
-int emul_bub(int fd, const char *dirname) {
+int emul_bub(HANDLE fd, const char *dirname) {
 	char string_buffer[256];
-	char *b, buffer[1024], *filename, pathname[PATH_MAX];
+	char buffer[1024], *filename, pathname[PATH_MAX];
 	unsigned char *values[64];
 	int vcnt, binary;
 	while (serial_read_string(fd, string_buffer, sizeof(string_buffer)) >= 0) {
 		if (*string_buffer == '\0')
 			goto error_loop;
 #ifdef DEBUG
-		for (int i = 0; i < strlen(string_buffer); i++)
+		for (int i = 0; i < (int)strlen(string_buffer); i++)
 			printf("%02x ", (unsigned char)*(string_buffer + i));
 		printf("\n");
 #endif
@@ -244,7 +245,7 @@ int emul_bub(int fd, const char *dirname) {
 		vcnt = split_csv(string_buffer, (char **)values, ARRAY_COUNT(values));
 #ifdef DEBUG
 		for (int i = 0; i < vcnt; i++) {
-			for (int j = 0; j < strlen((char *)values[i]); j++)
+			for (int j = 0; j < (int)strlen((char *)values[i]); j++)
 				printf("%02x ", *(values[i] + j));
 			printf("\n");
 		}
@@ -258,7 +259,7 @@ int emul_bub(int fd, const char *dirname) {
 				printf("SAVE%s : Parameter error.\n", binary ? "M" : "");
 				goto error_loop;
 			}
-			sprintf(pathname, "%s/%s", dirname, filename);
+			sprintf(pathname, "%s%c%s", dirname, PATH_SEPARATOR, filename);
 			if (!binary) {
 				//BUBR SAVE "filename"
 				//BUBR SAVE "filename",A
@@ -290,10 +291,10 @@ int emul_bub(int fd, const char *dirname) {
 				printf("LOAD%s : Parameter error.\n", binary ? "M" : "");
 				goto error_loop;
 			}
-			sprintf(pathname, "%s/%s", dirname, filename);
+			sprintf(pathname, "%s%c%s", dirname, PATH_SEPARATOR, filename);
 			if (!is_file(pathname)) {
 				printf("LOAD%s \"%s\" : File not found.\n", binary ? "M" : "", filename);
-				block_write_string_result(fd, ERROR_FILE_NOT_FOUND);
+				block_write_string_result(fd, ERROR_FILE_DOES_NOT_FOUND);
 				continue;
 			}
 			if (!binary) {
@@ -338,9 +339,27 @@ int emul_bub(int fd, const char *dirname) {
 			}
 			continue;
 		} else if (*(values[0] + 0) == 0xb0) {	//FILES
+			printf("FILES\n");
+#ifdef WIN32
+			WIN32_FIND_DATA win32fd;
+			char wildcard[PATH_MAX];
+			sprintf(wildcard, "%s\\*.*", dirname);
+			HANDLE hndl = FindFirstFile(wildcard, &win32fd);
+			if (hndl == INVALID_HANDLE_VALUE) {
+				block_write_string_result(fd, ERROR_DIR_ACCESS);
+				continue;
+			}
+			block_write_byte(fd, CMD_PRINT);
+			do {
+				if (!(win32fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+					sprintf(buffer, "%s%c%c", win32fd.cFileName, 0x0d, 0x0a);
+					block_write(fd, buffer, strlen(buffer));
+				}
+			} while (FindNextFile(hndl, &win32fd));
+			FindClose(hndl);
+#else
 			DIR *dir = NULL;
 			struct dirent *e = NULL;
-			printf("FILES\n");
 			if ((dir = opendir(dirname)) == NULL) {
 				block_write_string_result(fd, ERROR_DIR_ACCESS);
 				continue;
@@ -352,6 +371,7 @@ int emul_bub(int fd, const char *dirname) {
 					block_write(fd, buffer, strlen(buffer));
 				}
 			closedir(dir);
+#endif
 			block_write_byte(fd, 0x1a);
 			continue;
 		}

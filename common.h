@@ -17,10 +17,28 @@
 
 //#define DEBUG	1
 
+#ifdef WIN32
+#define	SERIAL_PORT		"COM0:"
+#define	PATH_MAX		MAX_PATH
+#define	PATH_SEPARATOR	'\\'
+#define	B38400			38400
+#define	MIN(a,b)		((a) < (b) ? (a) : (b))
+#define	usleep(m)		Sleep((m) / 10)
+#define	strcasecmp		_stricmp
+#define	read			read_win32
+#define	write			write_win32
+#define	close			CloseHandle
+#define	S_ISDIR(m)		(((m) & S_IFMT) == S_IFDIR)
+#define	S_ISREG(m)		(((m) & S_IFMT) == S_IFREG)
+#else
+#define PATH_SEPARATOR			'/'
+#define HANDLE					int
+#define INVALID_HANDLE_VALUE	-1
 #ifdef __linux__
 #define SERIAL_PORT		"/dev/ttyUSB0"
 #else
 #define SERIAL_PORT		"/dev/cu.usbserial-A104B2QE"
+#endif
 #endif
 
 #define FT245RL_BLOCK	64
@@ -106,28 +124,28 @@ int split_csv(char *buffer, char **values, int count);
 char *get_quoted_filename(unsigned char *value, int offset);
 
 //io.h
-int serial_read_string(int fd, char *buffer, int length);
-int block_read(int fd, void *data, int len);
-int block_write(int fd, const void *data, int len);
-int block_write_byte(int fd, int d);
-int block_write_string(int fd, const char *string);
-int block_write_string_result(int fd, const char *message);
+int serial_read_string(HANDLE fd, char *buffer, int length);
+int block_read(HANDLE fd, void *data, int len);
+int block_write(HANDLE fd, const void *data, int len);
+int block_write_byte(HANDLE fd, int d);
+int block_write_string(HANDLE fd, const char *string);
+int block_write_string_result(HANDLE fd, const char *message);
 int get_sector_file(FILE *fp, int sector, unsigned char *data);
 int get_sector_mem(const unsigned char *image, unsigned long len, int sector, unsigned char *data);
 int put_sector_mem(unsigned char *image, unsigned long len, int sector, unsigned char *data);
 void *get_file_image(const char *filename, unsigned long *filesize);
 int put_file_image(const char *filename, const unsigned char *data, unsigned long length);
-int recv_file(int fd, const char *filename);
-int send_file(int fd, const char *filename, unsigned int start, unsigned int exec);
-int recv_mem(int fd, void *buffer);
-int send_mem(int fd, const void *buffer, int length, unsigned int st, unsigned int ex);
-int open_serial_device(int baudRate);
+int recv_file(HANDLE fd, const char *filename);
+int send_file(HANDLE fd, const char *filename, unsigned int start, unsigned int exec);
+int recv_mem(HANDLE fd, void *buffer);
+int send_mem(HANDLE fd, const void *buffer, int length, unsigned int st, unsigned int ex);
+HANDLE open_serial_device(int baudRate);
 
 //bubemul.c
-int emul_bub(int fd, const char *dirname);
+int emul_bub(HANDLE fd, const char *dirname);
 
 //d77emul.c
-int send_d77(int fd, const char *filename);
-int emul_d77(int fd, const char *filename1, const char *filename2);
+int send_d77(HANDLE fd, const char *filename);
+int emul_d77(HANDLE fd, const char *filename1, const char *filename2);
 
 #endif
