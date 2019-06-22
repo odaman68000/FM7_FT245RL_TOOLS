@@ -37,14 +37,14 @@
 #include "common.h"
 
 #ifdef WIN32
-int read_win32(HANDLE fd, void *buffer, int size) {
+static int read_win32(HANDLE fd, void *buffer, int size) {
 	int length = 0;
 	if (!ReadFile(fd, buffer, size, &length, NULL))
 		return -1;
 	return length;
 }
 
-int write_win32(HANDLE fd, void *buffer, int size) {
+static int write_win32(HANDLE fd, void *buffer, int size) {
 	int length = 0;
 	if (!WriteFile(fd, buffer, size, &length, NULL))
 		return -1;
