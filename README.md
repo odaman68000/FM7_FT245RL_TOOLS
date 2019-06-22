@@ -99,7 +99,7 @@ PC(Windows, Linux)/Mac側では以下のようにしてサーバプログラム�
 
 FT245RL を FM-7 に接続するアイデアおよび、ハードウェア設計は shuji_akita2001 氏 ( shuji_akita2001@yahoo.co.jp ) によります。たまたま自分が、 shuji_akita2001 氏よりこのハードウェアを紹介いただいた事で、このツール群を実装するに至りました。  
 元々は、プリンタポートを使った 1,200bps 程度の低速通信で頑張ってたところ、16KB/secもの超高速でデータの送受信できるこのハードウェアに出会い、何とかコレを実用レベルで使えるように仕立て上げるべし！と強く思い、一気に作り上げました。  
-このハードウェアが無ければ今だに、FDイメージを延々1時間掛けてFM-7に転送していた事でしょう。今は5分も掛かりませんよｗｗｗ
+このハードウェアが無ければ今だに、FDイメージを延々1時間掛けてFM-7に転送していた事でしょう。今は5分も掛かりませんよｗ
 
 Software : Copyright (C) 2019 by odaman68000 (odaman68k.amiga@gmail.com)  
 Hardware : Copyright (C) 2019 by shuji_akita2001 (shuji_akita2001@yahoo.co.jp)
@@ -130,3 +130,8 @@ Hardware : Copyright (C) 2019 by shuji_akita2001 (shuji_akita2001@yahoo.co.jp)
 90 IF PEEK(&HFDFE) AND &H80 THEN 90
 100 POKE &HFDFD,1:D=PEEK(&HFDFE) AND &H7F:POKE &HFDFD,0:RETURN
 ```
+
+-----
+##### 免責事項
+なお、このツール群は無保証です。このツール群を利用する事で何らかの損害があっても当方は一切責任を負えません。  
+一部バイナリファイルも添付してありますが、ウィルスチェック等は行いませんので、ご自身の責任のもと利用してください。(基本的には自己でビルドしてもらうのが確実です)
