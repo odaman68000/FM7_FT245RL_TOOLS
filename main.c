@@ -39,7 +39,7 @@
 static volatile HANDLE fd = INVALID_HANDLE_VALUE;
 
 static void usage(void) {
-	printf("Usage: ft245tools COMMAND [Parameters]\n");
+	printf("Usage: ft245tools [-d device name] COMMAND [Parameters]\n");
 	printf(" SEND:\n");
 	printf("  rawsend filename.*\n");
 	printf("    - Send data without no headers.\n");
@@ -207,7 +207,8 @@ static void signal_setting(void) {
 #endif
 
 int main(int argc, const char *argv[]) {
-	int ret = 1;
+	int ret = 1, stp = 1;
+	const char *device_name = SERIAL_PORT;
 	struct {
 		const char *command;
 		int (*func)(HANDLE, int, const char **);
@@ -228,12 +229,17 @@ int main(int argc, const char *argv[]) {
 	signal_setting();
 #endif
 
-	if (argc < 2) {
+	if (argc >= 3)
+		if (strcasecmp("-d", argv[1]) == 0) {
+			device_name = argv[2];
+			stp += 2;
+		}
+	if (argc <= stp) {
 		usage();
 		goto error;
 	}
 	for (int i = 0; cmdtbl[i].command != NULL; i++)
-		if (strcasecmp(cmdtbl[i].command, argv[1]) == 0) {
+		if (strcasecmp(cmdtbl[i].command, argv[stp]) == 0) {
 			cmd = &cmdtbl[i];
 			break;
 		}
@@ -241,12 +247,12 @@ int main(int argc, const char *argv[]) {
 		usage();
 		goto error;
 	}
-	if ((fd = open_serial_device(B38400)) == INVALID_HANDLE_VALUE) {	// デバイスをオープンする
-        printf("Error: serial device open error.\n");
+	if ((fd = open_serial_device(device_name, B38400)) == INVALID_HANDLE_VALUE) {	// デバイスをオープンする
+        printf("Error: serial device open error. (%s)\n", device_name);
 		goto error;
     }
 	// okay, here we gooooooo!!
-	if ((ret = cmd->func(fd, argc, argv)) < 0)
+	if ((ret = cmd->func(fd, argc - stp + 1, argv + stp - 1)) < 0)
 		usage();
 error:
 	if (fd != INVALID_HANDLE_VALUE)

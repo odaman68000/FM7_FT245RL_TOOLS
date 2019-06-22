@@ -139,7 +139,7 @@ int recv_file(HANDLE fd, const char *filename);
 int send_file(HANDLE fd, const char *filename, unsigned int start, unsigned int exec);
 int recv_mem(HANDLE fd, void *buffer);
 int send_mem(HANDLE fd, const void *buffer, int length, unsigned int st, unsigned int ex);
-HANDLE open_serial_device(int baudRate);
+HANDLE open_serial_device(const char *device_name, int baudRate);
 
 //bubemul.c
 int emul_bub(HANDLE fd, const char *dirname);

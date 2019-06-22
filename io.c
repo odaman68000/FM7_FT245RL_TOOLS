@@ -373,11 +373,13 @@ int recv_file(HANDLE fd, const char *filename) {
 }
 
 //シリアルデバイスのオープン
-HANDLE open_serial_device(int baudRate) {
+HANDLE open_serial_device(const char *device_name, int baudRate) {
 	HANDLE fd;
+	if (device_name == NULL)
+		return INVALID_HANDLE_VALUE;
 #ifdef WIN32
 	DCB dcb;
-	if ((fd = CreateFile(SERIAL_PORT, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL)) == INVALID_HANDLE_VALUE)
+	if ((fd = CreateFile(device_name, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL)) == INVALID_HANDLE_VALUE)
 		goto error;
 	if (!GetCommState(fd, &dcb))
 		goto error;
@@ -402,7 +404,7 @@ error:
 	return INVALID_HANDLE_VALUE;
 #else
 	struct termios tio;					// シリアル通信設定
-	if ((fd = open(SERIAL_PORT, O_RDWR|O_NOCTTY)) < 0)	// デバイスをオープンする
+	if ((fd = open(device_name, O_RDWR|O_NOCTTY)) < 0)	// デバイスをオープンする
 		return INVALID_HANDLE_VALUE;
 	tcgetattr( fd, &tio );
 	cfmakeraw( &tio );					// RAWモード
