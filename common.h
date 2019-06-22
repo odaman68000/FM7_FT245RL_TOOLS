@@ -18,7 +18,7 @@
 //#define DEBUG	1
 
 #ifdef WIN32
-#define	SERIAL_PORT		"COM0:"
+#define	SERIAL_PORT		"COM0"
 #define	PATH_MAX		MAX_PATH
 #define	PATH_SEPARATOR	'\\'
 #define	B38400			38400
