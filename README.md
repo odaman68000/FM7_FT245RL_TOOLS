@@ -32,10 +32,21 @@ FT245RLを使っている為、約16KB/secという非常に高速な通信速�
 
 ## 使い方
 
-##### PC(Linux)/Mac で利用可能なコマンド
-* `ft245tools` - makeコマンドでビルドします
+##### PC(Windows, Linux)/Mac で利用可能なコマンド
+* Windows
+    * `ft245tools.exe` - Visual Studio 2015以降で利用可能な`ft245tools.sln`を用意してあるので、これでビルドします
+* Linux
+    * `ft245tools` - makeコマンドでビルドします
+* Mac
+    * `ft245tools` - makeコマンドでビルドします
 
-基本的には、パラメタを全く指定せずにコマンドを起動するとヘルプが表示されるので、数多くの機能の使い方が判るようになっています。
+基本的には、パラメタを全く指定せずにコマンドを起動するとヘルプが表示されるので、数多くの機能の使い方が判るようになっています。  
+以下の利用方法全てにおいて、以下のようにパラメタ指定する事で、シリアルポートデバイス名を指定できます。
+
+Windowsでの例 (COM4ポートを利用する場合)：  
+```
+C:\> ft245tools -d COM4 ...
+```
 
 ##### FM-7 側で利用するコマンド
 
@@ -46,13 +57,13 @@ FT245RLを使っている為、約16KB/secという非常に高速な通信速�
 
 このデータは、$FC00 〜 $FC63 に配置します。その上で、`SAVEM "FT245TRN",&HFC00,&HFC63,&HFC06` としてテープもしくは FD に保存してください。  
 
-`LOADM "FT245TRN",,R` として起動した上で、PC(Linux)/Mac 側から以下のコマンドを実行する事で、FM-7 側へデータを転送できます。
+`LOADM "FT245TRN",,R` として起動した上で、PC(Windows, Linux)/Mac側から以下のコマンドを実行する事で、FM-7 側へデータを転送できます。
 
 ```
-# ft245tools binsend [Filename] [配置先アドレス]
+# ft245tools [-d デバイス名] binsend Filename [配置先アドレス]
 ```
  
-* BUBEMUL - PC(Linux)/Mac のディレクトリをドライブと見立てて動作
+* BUBEMUL - PC(Windows, Linux)/Mac のディレクトリをドライブと見立てて動作
 
 まずは最初に、`FT245TRN` を利用して、FM-7側へ転送してください。配置アドレスは $6809〜 です。  
 `EXEC &H6809` とする事で、拡張 BASIC がインストールされます。以下のコマンドが利用可能です。
@@ -62,27 +73,27 @@ FT245RLを使っている為、約16KB/secという非常に高速な通信速�
 * `BUBR SAVEM "Filename",&Hssss,&Heeee,&Hxxxx` : バイナリセーブ
 * `BUBR LOADM "Filename"[,[&Hoooo][,R]]` : バイナリロード
 
-PC(Linux) / Mac 側では以下のようにしてサーバプログラムを起動します。`Directory name` として指定したディレクトリが、上記のコマンドで FM-7 側からアクセス可能となります。
+PC(Windows, Linux)/Mac側では以下のようにしてサーバプログラムを起動します。`Directory name` として指定したディレクトリが、上記のコマンドで FM-7 側からアクセス可能となります。
 
 ```
-# ft245tools bubemul [Directory name]
+# ft245tools [-d デバイス名] bubemul [Directory name]
 ```
 
 バイナリデータの保存形態は、FM-7の F-BASIC に準拠しており、バイナリデータの前後にヘッダとフッタが付与されて保存されます。
 
-* DRVEMUL - PC(Linux)/Mac 上に保存されている D77 を、FM-7から実ドライブとしてアクセス
+* DRVEMUL - PC(Windows, Linux)/Mac上に保存されている D77 を、FM-7から実ドライブとしてアクセス
 
 まずは最初に、`FT245TRN` を利用して、`DRVEMUL`をFM-7側へ転送してください。配置アドレスは $6809〜 です。  
 `EXEC &H6809` とする事で、ドライブアクセス関係の BIOS が拡張されます。  
 
-その後、PC(Linux)/Mac 側で以下のようにコマンド起動します。
+その後、PC(Windows, Linux)/Mac側で以下のようにコマンド起動します。
 
 ```
-# ft245tools d77emul [.D77 filename]
+# ft245tools [-d デバイス名] d77emul [.D77 filename]
 ```
 
-これ以降は ドライブ 0: に対する全てのアクセスが、PC(Linux)/Mac上の D77 へとリダイレクトされます。  
-ただ現状は Experimental という事で、FM-7側からいくらセクター情報を書き換えても PC(Linux)/Mac上でメモリ上記憶するだけで、D77ファイル自体の書き換えや更新は行いません。
+これ以降は ドライブ 0: に対する全てのアクセスが、PC(Windows, Linux)/Mac上の D77 へとリダイレクトされます。  
+ただ現状は Experimental という事で、FM-7側からいくらセクター情報を書き換えてもPC(Windows, Linux)/Mac上でメモリ上記憶するだけで、D77ファイル自体の書き換えや更新は行いません。
 
 ## 謝辞・作者について
 
@@ -99,9 +110,9 @@ Hardware : Copyright (C) 2019 by shuji_akita2001 (shuji_akita2001@yahoo.co.jp)
 `FT245TRN`は100バイトのバイナリですが、これをFM-7側に入力するの大変だなぁ...って人には、いい方法があります。(100バイト入力とドッチもドッチかも?)  
 
 1. 以下のBASICリストを FM-7側で入力し、念のため保存
-1. FM-7に搭載したFT245RLとPC(Linux)/MacをUSBケーブルで接続したのち、BASICプログラムを`RUN`します
-1. PC(Linux)/Mac 側からは以下のようにしてコマンド起動します。  
-    `# ft245tools binsend FM-7/bin/FT245TRN fc00`
+1. FM-7に搭載したFT245RLとPC(Windows, Linux)/MacをUSBケーブルで接続したのち、BASICプログラムを`RUN`します
+1. PC(Windows, Linux)/Mac側からは以下のようにしてコマンド起動します。  
+    `# ft245tools [-d デバイス名] binsend FM-7/bin/FT245TRN fc00`
 1. 成功したら、FM-7側で`FT245TRN`が保存されます。  
     BASICリストを見てもらえれば判りますが、突然保存を開始しますので、テープもしくはFDの準備をしてから実行してください。
 
