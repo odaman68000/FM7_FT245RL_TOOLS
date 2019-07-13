@@ -182,7 +182,16 @@ static int bubemul(HANDLE fd, int argc, const char **argv) {
 	return 0;
 }
 
-#ifndef WIN32
+#ifdef WIN32
+static int set_priority(void) {
+	HANDLE hndl = GetCurrentProcess();
+	return SetPriorityClass(hndl, REALTIME_PRIORITY_CLASS) ? 0 : 1;
+}
+
+static int other_settings(void) {
+	return set_priority();
+}
+#else
 static void sig_action(int sig, siginfo_t *info, void *ctx) {
 	if (fd >= 0)
 		close(fd);
@@ -203,6 +212,11 @@ static void signal_setting(void) {
 	sigaction(SIGHUP, &sig, NULL);
 	sigaction(SIGQUIT, &sig, NULL);
 	sigaction(SIGKILL, &sig, NULL);
+}
+
+static int other_settings(void) {
+	signal_setting();
+	return 0;
 }
 #endif
 
@@ -225,10 +239,6 @@ int main(int argc, const char *argv[]) {
 	printf("ft245tools Version 1.0\n");
 	printf("Copyright (C) 2019 by odaman68000. All rights reserved.\n\n");
 
-#ifndef WIN32
-	signal_setting();
-#endif
-
 	if (argc >= 3)
 		if (strcasecmp("-d", argv[1]) == 0) {
 			device_name = argv[2];
@@ -247,6 +257,9 @@ int main(int argc, const char *argv[]) {
 		usage();
 		goto error;
 	}
+
+	other_settings();
+
 	if ((fd = open_serial_device(device_name, B38400)) == INVALID_HANDLE_VALUE) {	// デバイスをオープンする
         printf("Error: serial device open error. (%s)\n", device_name);
 		goto error;
