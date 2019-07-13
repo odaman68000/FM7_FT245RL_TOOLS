@@ -93,9 +93,9 @@ typedef struct {
 
 //D77の物理セクタ情報テーブル (リトルエンディアン)
 typedef struct {
-	char track;		//トラック (0〜39)
-	char side;		//サイド (0:表, 1:裏)
-	char sector;	//セクタ (1〜16)
+	unsigned char track;	//トラック (0〜39)
+	unsigned char side;		//サイド (0:表, 1:裏)
+	unsigned char sector;	//セクタ (1〜16)
 	char reserved[11];
 	unsigned short size;
 } D77_SECTOR_DATA; 
@@ -139,12 +139,15 @@ int recv_file(HANDLE fd, const char *filename);
 int send_file(HANDLE fd, const char *filename, unsigned int start, unsigned int exec);
 int recv_mem(HANDLE fd, void *buffer);
 int send_mem(HANDLE fd, const void *buffer, int length, unsigned int st, unsigned int ex);
+int send_ascii_file(HANDLE fd, const char *filename);
+int recv_ascii_file(HANDLE fd, const char *filename);
 HANDLE open_serial_device(const char *device_name, int baudRate);
 
 //bubemul.c
 int emul_bub(HANDLE fd, const char *dirname);
 
 //d77emul.c
+int recv_d77(HANDLE fd, const char *filename);
 int send_d77(HANDLE fd, const char *filename);
 int emul_d77(HANDLE fd, const char *filename1, const char *filename2);
 

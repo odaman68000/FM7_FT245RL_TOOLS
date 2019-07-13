@@ -50,10 +50,19 @@ static void usage(void) {
 	printf("  d77send filename.D77\n");
 	printf("    - Send D77 image data and write it to FD.\n");
 	printf("      (with FT245D77)\n");
+	printf("  ascsend filename.*\n");
+	printf("    - Send ascii text data (EOF = $1a).\n");
+	printf("      (with MMASCRCV)\n");
 	printf(" RECEIVE:\n");
 	printf("  binrecv filename.*\n");
 	printf("    - Receive data from FM-8/7/77.\n");
 	printf("      (with FT245TRN)\n");
+	printf("  d77recv filename.D77\n");
+	printf("    - Receive D77 image data and write as D77.\n");
+	printf("      (with MMD77SND)\n");
+	printf("  ascrecv filename.*\n");
+	printf("    - Receive ascii text data (EOF = $1a).\n");
+	printf("      (with MMASCSND)\n");
 	printf(" DRIVE-EMULATION:\n");
 	printf("  bubemul directory\n");
 	printf("    - Special BUBR command filesystem emulation.\n");
@@ -143,6 +152,23 @@ static int d77send(HANDLE fd, int argc, const char **argv) {
 	return 0;
 }
 
+static int d77recv(HANDLE fd, int argc, const char **argv) {
+	printf("Receive as D77 disk image: ");
+	if (argc < 3) {
+		printf("File name is not specified.\n");
+		return -1;
+	}
+	printf("%s\n", argv[2]);
+	if (recv_d77(fd, argv[2]) < 0) {
+		printf("Error: failed to write disk image.\n");
+		return 1;
+	}
+	printf("Completed. (CTRL-C to quit)\n");
+	char b[1];
+	block_read(fd, b, 1);
+	return 0;
+}
+
 static int d77emul(HANDLE fd, int argc, const char **argv) {
 	printf("D77 disk emulation: ");
 	if (argc < 3) {
@@ -179,6 +205,44 @@ static int bubemul(HANDLE fd, int argc, const char **argv) {
 		printf("Error: Failed, anything goes wrong...\n");
 		return 1;
 	}
+	return 0;
+}
+
+static int ascsend(HANDLE fd, int argc, const char **argv) {
+	int sent = 0;
+	printf("Send as ascii: ");
+	if (argc < 3) {
+		printf("File name is not specified.\n");
+		return -1;
+	}
+	printf("%s\n", argv[2]);
+	if ((sent = send_ascii_file(fd, argv[2])) < 0) {
+ 		printf("Error: failed to send file.\n");
+		return 1;
+	}
+	printf("%d bytes sent.\n", sent);
+	printf("Completed. (CTRL-C to quit)\n");
+	char b[1];
+	block_read(fd, b, 1);
+	return 0;
+}
+
+static int ascrecv(HANDLE fd, int argc, const char **argv) {
+	int size = 0;
+	printf("Receive as ascii: ");
+	if (argc < 3) {
+		printf("File name is not specified.\n");
+		return -1;
+	}
+	printf("%s\n", argv[2]);
+	if ((size = recv_ascii_file(fd, argv[2])) < 0) {
+ 		printf("Error: failed to receive file.\n");
+		return 1;
+	}
+	printf("%d bytes received.\n", size);
+	printf("Completed. (CTRL-C to quit)\n");
+	char b[1];
+	block_read(fd, b, 1);
 	return 0;
 }
 
@@ -231,8 +295,11 @@ int main(int argc, const char *argv[]) {
 		{ "binsend", binsend },
 		{ "binrecv", binrecv },
 		{ "d77send", d77send },
+		{ "d77recv", d77recv },
 		{ "d77emul", d77emul },
 		{ "bubemul", bubemul },
+		{ "ascsend", ascsend },
+		{ "ascrecv", ascrecv },
 		{ NULL, NULL }
 	};
 

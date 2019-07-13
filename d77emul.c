@@ -36,6 +36,44 @@
 
 #include "common.h"
 
+int recv_d77(HANDLE fd, const char *filename) {
+	FILE *fp = NULL;
+	D77_SECTOR_DATA header;
+	unsigned char secdat[256];
+	int ret = 1, len = 0;
+	if ((fp = fopen(filename, "wb")) == NULL)
+		return -1;
+	memset(secdat, 0x00, sizeof(secdat));
+	fwrite(secdat, 1, sizeof(secdat), fp);
+	fwrite(secdat, 1, sizeof(secdat), fp);
+	fwrite(secdat, 1, 0xb0, fp);
+	while (1) {
+		if (block_read(fd, &header, 1) < 0) {
+			printf("block_read() failed.\n");
+			goto error;
+		}
+		if (header.track == 0xff)
+			break;
+		if (block_read(fd, ((char *)&header) + 1, sizeof(header) - 1) < 0) {
+			printf("block_read() failed.\n");
+			goto error;
+		}
+		if (block_read(fd, secdat, sizeof(secdat)) < 0) {
+			printf("block_read() failed.\n");
+			goto error;
+		}
+		fwrite(&header, 1, sizeof(header), fp);
+		fwrite(secdat, 1, sizeof(secdat), fp);
+		printf("Track: %d, Sector: %d, Side: %d\n", header.track, header.sector, header.side);
+	}
+	ret = 0;
+error:
+	if (fp != NULL)
+		fclose(fp);
+	return ret;
+
+}
+
 int send_d77(HANDLE fd, const char *filename) {
 	FILE *fp = NULL;
 	D77_SECTOR_DATA header;

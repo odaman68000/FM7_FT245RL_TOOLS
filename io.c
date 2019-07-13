@@ -372,6 +372,39 @@ int recv_file(HANDLE fd, const char *filename) {
 	return put_file_image(filename, buffer, len);
 }
 
+int send_ascii_file(HANDLE fd, const char *filename) {
+	unsigned long i, size = 0, sent = 0;
+	const unsigned char *ascii = get_file_image(filename, &size);
+	if (ascii == NULL)
+		return -1;
+	for (i = 0; i < size; i++, sent++) {
+		if (*(ascii + i) == 0x1a)
+			break;
+		block_write_byte(fd, *(ascii + i));
+	}
+	block_write_byte(fd, 0x1a);
+	return (int)(sent + 1);
+}
+
+int recv_ascii_file(HANDLE fd, const char *filename) {
+	int ret = -1, received = 0;
+	FILE *fp = NULL;
+	char c[1] = { 0x00 };
+	if ((fp = fopen(filename, "wb")) == NULL)
+		goto error;
+	for ( ; c[0] != 0x1a; received++) {
+		if (block_read(fd, c, sizeof(c)) < 0)
+			goto error;
+		if (fwrite(c, 1, sizeof(c), fp) < 0)
+			goto error;
+	}
+	ret = received;
+error:
+	if (fp != NULL)
+		fclose(fp);
+	return ret;
+}
+
 //シリアルデバイスのオープン
 HANDLE open_serial_device(const char *device_name, int baudRate) {
 	HANDLE fd;
