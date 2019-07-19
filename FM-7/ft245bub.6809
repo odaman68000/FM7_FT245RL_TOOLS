@@ -22,6 +22,7 @@ TRNNUM	equ	$9162	;ASCII-LOAD
 SYERR_	equ	$92a0
 CRLF1_	equ	$9b47
 TRNA2B	equ	$c28c	;ASCII-LOAD
+REHASH	equ	$c730
 OUTCH_	equ	$d08e
 BIOENT	equ	$fbfa
 
@@ -138,13 +139,16 @@ savem	bsr	rh
 	jmp	READY_
 
 load	bsr	rh
-	ldd	TEXTAD
-	tfr	d,x
+	ldx	TEXTAD
+	tfr	x,d
 	addd	FT2TRN+2
 	std	VARAD
+	pshs	x
 load0	jsr	RECVBX
 	cmpx	VARAD
 	bne	load0
+	puls	x
+	jsr	REHASH
 	jmp	READY_
 
 loadm	jsr	RECV
