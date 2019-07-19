@@ -60,12 +60,16 @@ static int get_fm7_int(unsigned char *buffer) {
 }
 
 static int get_basic_header(unsigned char *data, unsigned long size, BAS_HEADER **header, unsigned char **body, unsigned long *body_size, BAS_FOOTER **footer) {
+	unsigned char *eof = NULL;
 	if (size < (sizeof(BAS_HEADER) + sizeof(BAS_FOOTER)))
 		return -1;
 	*header = (BAS_HEADER *)data;
 	if ((*header)->type1 != 0xff || (*header)->type2 != 0xff || (*header)->type3 != 0xff)
 		return 1;
-	*footer = (BAS_FOOTER *)(data + size - sizeof(BAS_FOOTER));
+	for (eof = data + size - 1; eof >= data && *eof != 0x1a; --eof);
+	if (eof < data)
+		return 1;
+	*footer = (BAS_FOOTER *)(eof - sizeof(BAS_FOOTER) + 1);
 	if ((*footer)->type != 0x00 || (*footer)->eof != 0x1a)
 		return 1;
 	*body = (data + sizeof(BAS_HEADER));
