@@ -7,7 +7,7 @@ FM-7 FT245RL Tools
 このツールを使うと、以下のようなことが出来ます。
 
 * `BINSEND` : PCとFM-7の間でバイナリデータの送受信
-* `BUBEMUL` : FM-7上から、PC上のフォルダをディスクドライブとして見立てて利用
+* `BUBEMUL` : FM-7上から、PC上のフォルダまたはD77ドライブイメージをディスクドライブとして見立てて利用
 * `D77SEND` : PCからD77ディスクイメージを転送してFM-7上で実FDDメディア上に書き込み
 * `DRVEMUL` : FM-7側から PCに保存されている D77イメージを実ドライブとしてアクセス
 
@@ -63,7 +63,7 @@ C:\> ft245tools -d COM4 ...
 # ft245tools [-d デバイス名] binsend Filename [配置先アドレス]
 ```
  
-* BUBEMUL - PC(Windows, Linux)/Mac のディレクトリをドライブと見立てて動作
+* BUBEMUL - PC(Windows, Linux)/Mac のディレクトリまたはD77ドライブイメージをドライブと見立てて動作
 
 まずは最初に、`FT245TRN` を利用して、FM-7側へ転送してください。配置アドレスは $6809〜 です。  
 `EXEC &H6809` とする事で、拡張 BASIC がインストールされます。以下のコマンドが利用可能です。
@@ -73,10 +73,11 @@ C:\> ft245tools -d COM4 ...
 * `BUBR SAVEM "Filename",&Hssss,&Heeee,&Hxxxx` : バイナリセーブ
 * `BUBR LOADM "Filename"[,[&Hoooo][,R]]` : バイナリロード
 
-PC(Windows, Linux)/Mac側では以下のようにしてサーバプログラムを起動します。`Directory name` として指定したディレクトリが、上記のコマンドで FM-7 側からアクセス可能となります。
+PC(Windows, Linux)/Mac側では以下のようにしてサーバプログラムを起動します。`dirname` として指定したディレクトリ または `.D77 filename`として指定したドライブイメージが、上記のコマンドで FM-7 側からアクセス可能となります。  
+なお、現在のところ、.D77ドライブイメージに関しては読込処理(`LOAD`, `LOADM`, `LOADR`)にしか対応していません。
 
 ```
-# ft245tools [-d デバイス名] bubemul [Directory name]
+# ft245tools [-d デバイス名] bubemul [dirname | .D77 filename]
 ```
 
 バイナリデータの保存形態は、FM-7の F-BASIC に準拠しており、バイナリデータの前後にヘッダとフッタが付与されて保存されます。
