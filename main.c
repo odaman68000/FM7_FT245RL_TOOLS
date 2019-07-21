@@ -196,7 +196,14 @@ static int bubemul(HANDLE fd, int argc, const char **argv) {
 		return -1;
 	}
 	const char *dirname = argv[2];
-	if (!is_dir(dirname)) {
+	if (is_dir(dirname)) {
+		//directory mode ok!!
+	} else if (strcasecmp(get_extension(dirname), "d77") == 0) {
+		if (!is_file(dirname)) {
+			printf("File is not D77 disk image.\n");
+			return -1;
+		}
+	} else {
 		printf("Directory path should be specified.\n");
 		return -1;
 	}
@@ -328,9 +335,9 @@ int main(int argc, const char *argv[]) {
 	other_settings();
 
 	if ((fd = open_serial_device(device_name, B38400)) == INVALID_HANDLE_VALUE) {	// デバイスをオープンする
-        printf("Error: serial device open error. (%s)\n", device_name);
+		printf("Error: serial device open error. (%s)\n", device_name);
 		goto error;
-    }
+	}
 	// okay, here we gooooooo!!
 	if ((ret = cmd->func(fd, argc - stp + 1, argv + stp - 1)) < 0)
 		usage();
@@ -338,5 +345,5 @@ error:
 	if (fd != INVALID_HANDLE_VALUE)
 		close(fd);									// デバイスのクローズ
 	fd = INVALID_HANDLE_VALUE;
-    return ret < 0 ? -ret : ret;
+	return ret < 0 ? -ret : ret;
 }

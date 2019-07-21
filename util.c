@@ -56,6 +56,13 @@ void dump(const void *data, int size) {
 	}
 }
 
+const char *get_extension(const char *filename) {
+	const char *ret = NULL;
+	if (filename == NULL || (ret = strchr(filename, '.')) == NULL)
+		return "";
+	return ret + 1;
+}
+
 //指定のパスがディレクトリかを判定
 int is_dir(const char *path) {
 	int ret = get_stmode(path);

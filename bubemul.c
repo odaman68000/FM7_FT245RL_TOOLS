@@ -116,14 +116,12 @@ static int emul_bub_save(HANDLE fd, const char *pathname) {
 
 //F-BASIC ファイルをファイルから読み込んで FM-7 に送信
 //BUBR LOAD "filename"
-static int emul_bub_load(HANDLE fd, const char *pathname) {
+static int emul_bub_load(HANDLE fd, unsigned char *buffer, unsigned long size) {
 	int ret = -1;
-	unsigned long size, body_size;
+	unsigned long body_size;
 	BAS_HEADER *header;
 	BAS_FOOTER *footer;
-	unsigned char *buffer = NULL, *body = NULL;
-	if ((buffer = get_file_image(pathname, &size)) == NULL)
-		goto error;
+	unsigned char *body = NULL;
 	if (get_basic_header(buffer, size, &header, &body, &body_size, &footer) == 0) {
 		//BASIC data in binary
 		block_write_byte(fd, CMD_LOAD);
@@ -148,8 +146,6 @@ static int emul_bub_load(HANDLE fd, const char *pathname) {
 		ret = block_write_string(fd, (char *)buffer);
 	}
 error:
-	if (buffer != NULL)
-		free(buffer);
 	return ret;
 }
 
@@ -187,14 +183,11 @@ static int emul_bub_savem(HANDLE fd, const char *pathname, int st, int ed, int e
 //BUBR LOADM "filename"
 //BUBR LOADM "filename",&Hoffset
 //BUBR LOADM "filename",&Hoffset,R
-static int emul_bub_loadm(HANDLE fd, const char *pathname, int offset, int exec) {
+static int emul_bub_loadm(HANDLE fd, unsigned char *buffer, unsigned long size, int offset, int exec) {
 	int ret = -1;
-	unsigned long size;
 	BIN_HEADER *header;
 	BIN_FOOTER *footer;
-	unsigned char *buffer = NULL, *body = NULL;
-	if ((buffer = get_file_image(pathname, &size)) == NULL)
-		goto error;
+	unsigned char *body = NULL;
 	if (get_binary_header(buffer, size, &header, &body, &footer) != 0) {
 		block_write_string_result(fd, ERROR_ILLEGAL_FILE_MODE);
 		goto error;
@@ -202,8 +195,6 @@ static int emul_bub_loadm(HANDLE fd, const char *pathname, int offset, int exec)
 	block_write_byte(fd, CMD_LOADM);
 	ret = send_mem(fd, body, header->length, header->start + offset, exec == 0 ? 0 : footer->exec + offset);
 error:
-	if (buffer != NULL)
-		free(buffer);
 	return ret;
 }
 
@@ -213,23 +204,21 @@ error:
 //BUBR LOADR "filename",&Hstart,N
 //BUBR LOADR "filename",&Hstart,&Hexec
 //BUBR LOADR "filename",&Hstart,&Hexec,N
-static int emul_bub_loadr(HANDLE fd, const char *pathname, int st, int ex, int without_header) {
-	int ret = -1;
-	unsigned long size;
+static int emul_bub_loadr(HANDLE fd, unsigned char *buffer, unsigned long size, int st, int ex, int without_header) {
 	BIN_HEADER *header;
 	BIN_FOOTER *footer;
-	unsigned char *buffer = NULL, *body = NULL;
-	if ((buffer = get_file_image(pathname, &size)) == NULL)
-		goto error;
+	unsigned char *body = NULL;
 	body = buffer;
 	if (without_header && get_binary_header(buffer, size, &header, &body, &footer) == 0)
 		size = header->length;
 	block_write_byte(fd, CMD_LOADM);
-	ret = send_mem(fd, body, size, st, ex);
-error:
-	if (buffer != NULL)
-		free(buffer);
-	return ret;
+	return send_mem(fd, body, size, st, ex);
+}
+
+static void emul_bub_dir_callback(D77HANDLE *handle, HANDLE fd, const unsigned char *filename) {
+	char buffer[16];
+	sprintf(buffer, "%s%c%c", filename, 0x0d, 0x0a);
+	block_write(fd, buffer, strlen(buffer));
 }
 
 int emul_bub(HANDLE fd, const char *dirname) {
@@ -237,7 +226,18 @@ int emul_bub(HANDLE fd, const char *dirname) {
 	char buffer[1024], *filename, pathname[PATH_MAX];
 	unsigned char *values[64];
 	int vcnt, binary;
+	D77HANDLE *d77handle = NULL;
+	void *object = NULL;
+	unsigned long object_size = 0;
+	if (is_file(dirname) && (d77handle = d77filesystem_open(dirname)) == NULL) {
+		printf("Failed to open %s as D77 disk image.\n", dirname);
+		return 1;
+	}
 	while (serial_read_string(fd, string_buffer, sizeof(string_buffer)) >= 0) {
+		if (object != NULL)
+			free(object);
+		object = NULL;
+		object_size = 0;
 		if (*string_buffer == '\0')
 			goto error_loop;
 #ifdef DEBUG
@@ -255,6 +255,10 @@ int emul_bub(HANDLE fd, const char *dirname) {
 		}
 #endif
 		if (*(values[0] + 0) == 0xaa) {			//SAVE
+			if (d77handle != NULL) {
+				printf("SAVE%s : not supported for D77.\n", binary ? "M" : "");
+				goto error_loop;
+			}
 			int p1 = 0, p2 = 0, p3 = -1;
 			if ((*(values[0] + 1) & 0xdf) == 'M')		//SAVEM
 				binary = 1;
@@ -295,8 +299,14 @@ int emul_bub(HANDLE fd, const char *dirname) {
 				printf("LOAD%s : Parameter error.\n", binary ? "M" : "");
 				goto error_loop;
 			}
-			sprintf(pathname, "%s%c%s", dirname, PATH_SEPARATOR, filename);
-			if (!is_file(pathname)) {
+			if (d77handle != NULL)
+				object = d77filesystem_get(d77handle, filename, &object_size);
+			else {
+				sprintf(pathname, "%s%c%s", dirname, PATH_SEPARATOR, filename);
+				if (is_file(pathname))
+					object = get_file_image(pathname, &object_size);
+			}
+			if (object == NULL) {
 				printf("LOAD%s \"%s\" : File not found.\n", binary ? "M" : "", filename);
 				block_write_string_result(fd, ERROR_FILE_DOES_NOT_FOUND);
 				continue;
@@ -304,7 +314,7 @@ int emul_bub(HANDLE fd, const char *dirname) {
 			if (!binary) {
 				//BUBR LOAD "filename"
 				printf("LOAD \"%s\"\n", filename);
-				emul_bub_load(fd, pathname);
+				emul_bub_load(fd, object, object_size);
 			} else {
 				if (vcnt > 1)
 					p1 = get_fm7_int(values[1]);
@@ -320,7 +330,7 @@ int emul_bub(HANDLE fd, const char *dirname) {
 						continue;
 					}
 					printf("LOADM \"%s\",&H%04X%s\n", filename, p1, p2 ? ",R" : "");
-					emul_bub_loadm(fd, pathname, p1, p2);
+					emul_bub_loadm(fd, object, object_size, p1, p2);
 				} else {
 					//BUBR LOADR "filename",&Hstart
 					//BUBR LOADM "filename",&Hstart,,N
@@ -338,12 +348,18 @@ int emul_bub(HANDLE fd, const char *dirname) {
 						continue;
 					}
 					printf("LOADR \"%s\",$%04X,$%04X%s\n", filename, p1, p2, p3 ? ",N" : "");
-					emul_bub_loadr(fd, pathname, p1, p2, p3);
+					emul_bub_loadr(fd, object, object_size, p1, p2, p3);
 				}
 			}
 			continue;
 		} else if (*(values[0] + 0) == 0xb0) {	//FILES
 			printf("FILES\n");
+			if (d77handle != NULL) {
+				block_write_byte(fd, CMD_PRINT);
+				d77filesystem_dir(d77handle, fd, emul_bub_dir_callback);
+				block_write_byte(fd, 0x1a);
+				continue;
+			}
 #ifdef WIN32
 			WIN32_FIND_DATA win32fd;
 			char wildcard[PATH_MAX];
@@ -384,5 +400,7 @@ error_loop:
 		block_write_byte(fd, CMD_ERROR);
 	}
 	printf("Connection refused.\n");
+	if (d77handle != NULL)
+		d77filesystem_close(d77handle);
 	return 0;
 }

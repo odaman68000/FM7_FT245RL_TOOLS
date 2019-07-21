@@ -112,8 +112,15 @@ typedef enum {
 	CMD_END = 0xff	//CONTINUOUS COMMAND END
 } BUBCMD;
 
+typedef struct {
+	const char *d77_filename;
+	void *image_data;
+	unsigned long image_size;
+} D77HANDLE;
+
 //util.c
 void dump(const void *data, int size);
+const char *get_extension(const char *filename);
 int is_dir(const char *path);
 int is_file(const char *path);
 int is_file_in_path(const char *file, const char *path);
@@ -150,5 +157,11 @@ int emul_bub(HANDLE fd, const char *dirname);
 int recv_d77(HANDLE fd, const char *filename);
 int send_d77(HANDLE fd, const char *filename);
 int emul_d77(HANDLE fd, const char *filename1, const char *filename2);
+
+//d77filesystem.c
+void d77filesystem_dir(D77HANDLE *handle, HANDLE fd, void (*callback)(D77HANDLE *hndl, HANDLE fd, const unsigned char *filename));
+void *d77filesystem_get(D77HANDLE *handle, const char *filename, unsigned long *size);
+void d77filesystem_close(D77HANDLE *handle);
+D77HANDLE *d77filesystem_open(const char *d77_filename);
 
 #endif
