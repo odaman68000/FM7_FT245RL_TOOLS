@@ -155,6 +155,7 @@
   <ItemGroup>
     <ClCompile Include="..\bubemul.c" />
     <ClCompile Include="..\d77emul.c" />
+    <ClCompile Include="..\d77filesystem.c" />
     <ClCompile Include="..\io.c" />
     <ClCompile Include="..\main.c" />
     <ClCompile Include="..\util.c" />
