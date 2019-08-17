@@ -36,6 +36,10 @@
 
 #include "common.h"
 
+static const char *d77_fname[2] = { NULL, NULL };
+static void *image[4] = { NULL, NULL, NULL, NULL };
+static unsigned long filesize[4] = { 0, 0, 0, 0 };
+
 int recv_d77(HANDLE fd, const char *filename) {
 	FILE *fp = NULL;
 	D77_SECTOR_DATA header;
@@ -113,16 +117,20 @@ error:
 
 int emul_d77(HANDLE fd, const char *filename1, const char *filename2) {
 	RCB_DATA rcb;
-	void *image[2];
 	unsigned char secdat[256];
-	unsigned long filesize[2];
 	int ret = 1, len, is_write, index, sector;
-	image[0] = image[1] = NULL;
 	if ((image[0] = get_file_image(filename1, &filesize[0])) == NULL)
 		goto error;
-	if (filename2 != NULL)
+	if ((image[2] = get_file_image(filename1, &filesize[2])) == NULL)
+		goto error;
+	d77_fname[0] = filename1;
+	if (filename2 != NULL) {
 		if ((image[1] = get_file_image(filename2, &filesize[1])) == NULL)
 			goto error;
+		if ((image[3] = get_file_image(filename2, &filesize[3])) == NULL)
+			goto error;
+		d77_fname[1] = filename2;
+	}
 	printf("%lu bytes read, and connected. (CTRL-C to quit)\n", filesize[0]);
 	while (1) {
 		if ((len = block_read(fd, &rcb, sizeof(rcb))) < 0) {
@@ -151,18 +159,39 @@ int emul_d77(HANDLE fd, const char *filename1, const char *filename2) {
 			// read
 			if (get_sector_mem(image[index], filesize[index], sector, secdat) != 0)
 				printf("get_sector_mem() failed.\n");
-			//セクタの内容を送る(64 × 4 = 256 bytes)
+			//セクタの内容を送る
 			//FM-7側では, 物理セクタ情報にある通りのバイト数(256)を受信
-			for (int i = 0; i < sizeof(secdat); i += FT245RL_BLOCK)
-				if (block_write(fd, secdat + i, FT245RL_BLOCK) < 0)
-					printf("block_write() failed. (%d)\n", errno);
+			if (block_write(fd, secdat, sizeof(secdat)) < 0)
+				printf("block_write() failed. (%d)\n", errno);
 		}
 	}
 	ret = 0;
 error:
-	if (image[0] != NULL)
-		free(image[0]);
-	if (image[1] != NULL)
-		free(image[1]);
+	for (int i = 0; i < sizeof(image) / sizeof(image[0]); i++) {
+		if (image[i] != NULL)
+			free(image[i]);
+		image[i] = NULL;
+	}
 	return ret;
+}
+
+static int emul_d77_ctrlc_file(const char *filename, int index) {
+	if (filename == NULL || image[index] == NULL || image[index + 2] == NULL)
+		return 1;
+	if (memcmp(image[index], image[index + 2], filesize[index]) == 0)
+		return 1;
+	return put_file_image(filename, image[index], filesize[index]) ? -1 : 0;
+}
+
+int emul_d77_ctrlc(HANDLE fd) {
+	int ret0 = 1, ret1 = 1;
+	if (d77_fname[0] != NULL)
+		ret0 = emul_d77_ctrlc_file(d77_fname[0], 0);
+	if (d77_fname[1] != NULL)
+		ret1 = emul_d77_ctrlc_file(d77_fname[1], 1);
+	if (ret0 == 0 || ret1 == 0)
+		return 0;
+	if (ret0 > 0 || ret1 > 0)
+		return 1;
+	return -1;
 }

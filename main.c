@@ -36,7 +36,14 @@
 
 #include "common.h"
 
+typedef struct {
+	const char *command;
+	int (*func)(HANDLE, int, const char **);
+	int (*ctrlc)(HANDLE);
+} CMD_TBL;
+
 static volatile HANDLE fd = INVALID_HANDLE_VALUE;
+static volatile CMD_TBL *cmd = NULL;
 
 static void usage(void) {
 	printf("Usage: ft245tools [-d device name] COMMAND [Parameters]\n");
@@ -189,6 +196,15 @@ static int d77emul(HANDLE fd, int argc, const char **argv) {
 	return 0;
 }
 
+static int d77emul_ctrlc(HANDLE fd) {
+	int ret = 0;
+	if ((ret = emul_d77_ctrlc(fd)) == 0)
+		printf("D77 image was re-written successfully.\n");
+	else if (ret > 0)
+		printf("D77 image is not changed.\n");
+	return 0;
+}
+
 static int bubemul(HANDLE fd, int argc, const char **argv) {
 	printf("BUBR command filesystem emulation: ");
 	if (argc < 3) {
@@ -264,6 +280,8 @@ static int other_settings(void) {
 }
 #else
 static void sig_action(int sig, siginfo_t *info, void *ctx) {
+	if (cmd != NULL && cmd->ctrlc != NULL)
+		cmd->ctrlc(fd);
 	if (fd >= 0)
 		close(fd);
 	fd = -1;
@@ -294,20 +312,17 @@ static int other_settings(void) {
 int main(int argc, const char *argv[]) {
 	int ret = 1, stp = 1;
 	const char *device_name = SERIAL_PORT;
-	struct {
-		const char *command;
-		int (*func)(HANDLE, int, const char **);
-	} *cmd = NULL, cmdtbl[] = {
-		{ "rawsend", rawsend },
-		{ "binsend", binsend },
-		{ "binrecv", binrecv },
-		{ "d77send", d77send },
-		{ "d77recv", d77recv },
-		{ "d77emul", d77emul },
-		{ "bubemul", bubemul },
-		{ "ascsend", ascsend },
-		{ "ascrecv", ascrecv },
-		{ NULL, NULL }
+	CMD_TBL cmdtbl[] = {
+		{ "rawsend", rawsend, NULL },
+		{ "binsend", binsend, NULL },
+		{ "binrecv", binrecv, NULL },
+		{ "d77send", d77send, NULL },
+		{ "d77recv", d77recv, NULL },
+		{ "d77emul", d77emul, d77emul_ctrlc },
+		{ "bubemul", bubemul, NULL },
+		{ "ascsend", ascsend, NULL },
+		{ "ascrecv", ascrecv, NULL },
+		{ NULL, NULL, NULL }
 	};
 
 	printf("ft245tools Version 1.0\n");
@@ -342,6 +357,8 @@ int main(int argc, const char *argv[]) {
 	if ((ret = cmd->func(fd, argc - stp + 1, argv + stp - 1)) < 0)
 		usage();
 error:
+	if (cmd != NULL && cmd->ctrlc != NULL)
+		cmd->ctrlc(fd);
 	if (fd != INVALID_HANDLE_VALUE)
 		close(fd);									// デバイスのクローズ
 	fd = INVALID_HANDLE_VALUE;

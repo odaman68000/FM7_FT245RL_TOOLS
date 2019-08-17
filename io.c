@@ -259,7 +259,7 @@ error:
 }
 
 //メモリの内容をファイルに書き込む
-int put_file_image(const char *filename, const unsigned char *data, unsigned long length) {
+int put_file_image(const char *filename, const void *data, unsigned long length) {
 	int ret;
 	FILE *fp = NULL;
 	if ((fp = fopen(filename, "wb")) == NULL)

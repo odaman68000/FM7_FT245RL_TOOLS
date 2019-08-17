@@ -141,7 +141,7 @@ int get_sector_file(FILE *fp, int sector, unsigned char *data);
 int get_sector_mem(const unsigned char *image, unsigned long len, int sector, unsigned char *data);
 int put_sector_mem(unsigned char *image, unsigned long len, int sector, unsigned char *data);
 void *get_file_image(const char *filename, unsigned long *filesize);
-int put_file_image(const char *filename, const unsigned char *data, unsigned long length);
+int put_file_image(const char *filename, const void *data, unsigned long length);
 int recv_file(HANDLE fd, const char *filename);
 int send_file(HANDLE fd, const char *filename, unsigned int start, unsigned int exec);
 int recv_mem(HANDLE fd, void *buffer);
@@ -157,6 +157,7 @@ int emul_bub(HANDLE fd, const char *dirname);
 int recv_d77(HANDLE fd, const char *filename);
 int send_d77(HANDLE fd, const char *filename);
 int emul_d77(HANDLE fd, const char *filename1, const char *filename2);
+int emul_d77_ctrlc(HANDLE fd);
 
 //d77filesystem.c
 void d77filesystem_dir(D77HANDLE *handle, HANDLE fd, void (*callback)(D77HANDLE *hndl, HANDLE fd, const unsigned char *filename));
